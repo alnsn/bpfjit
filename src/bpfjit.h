@@ -43,13 +43,13 @@
 #include <sljitLir.h>
 
 
-#define BPF_SLJIT_A		SLJIT_RETURN_REG
-#define BPF_SLJIT_X		SLJIT_TEMPORARY_REG1
-#define BPF_SLJIT_TMP1		SLJIT_TEMPORARY_REG2
-#define BPF_SLJIT_TMP2		SLJIT_TEMPORARY_REG3
-#define BPF_SLJIT_BUF		SLJIT_GENERAL_REG1
-#define BPF_SLJIT_WIRELEN	SLJIT_GENERAL_REG2
-#define BPF_SLJIT_BUFLEN	SLJIT_GENERAL_REG3
+#define BPFJIT_A	SLJIT_RETURN_REG
+#define BPFJIT_X	SLJIT_TEMPORARY_REG1
+#define BPFJIT_TMP1	SLJIT_TEMPORARY_REG2
+#define BPFJIT_TMP2	SLJIT_TEMPORARY_REG3
+#define BPFJIT_BUF	SLJIT_GENERAL_REG1
+#define BPFJIT_WIRELEN	SLJIT_GENERAL_REG2
+#define BPFJIT_BUFLEN	SLJIT_GENERAL_REG3
 
 
 struct bpfjit_jump
@@ -58,7 +58,7 @@ struct bpfjit_jump
 	SLIST_ENTRY(bpfjit_jump) bj_entries;
 };
 
-const void *
-bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count);
+void *bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count);
+void bpfjit_free_code(void *code);
 
 #endif /* !_NET_BPFJIT_H_ */

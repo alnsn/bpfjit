@@ -32,10 +32,9 @@
 #include <assert.h>
 #include <inttypes.h>
 #include <stdbool.h>
-#include <sys/types.h>
-#include <sys/time.h>
-#include <sys/ioctl.h>
+#include <stdlib.h>
 #include <sys/queue.h>
+#include <sys/types.h>
 
 static int
 emit_read8(struct sljit_compiler* compiler, struct bpf_insn *pc)
@@ -43,8 +42,8 @@ emit_read8(struct sljit_compiler* compiler, struct bpf_insn *pc)
 
 	return sljit_emit_op1(compiler,
 	    SLJIT_MOV_UB,
-	    BPF_SLJIT_A, 0,
-	    SLJIT_MEM1(BPF_SLJIT_BUF), pc->k);
+	    BPFJIT_A, 0,
+	    SLJIT_MEM1(BPFJIT_BUF), pc->k);
 }
 
 static int
@@ -55,24 +54,24 @@ emit_read16(struct sljit_compiler* compiler, struct bpf_insn *pc)
 	/* tmp1 = buf[pc->k] */
 	status = sljit_emit_op1(compiler,
 	    SLJIT_MOV_UB,
-	    BPF_SLJIT_TMP1, 0,
-	    SLJIT_MEM1(BPF_SLJIT_BUF), pc->k);
+	    BPFJIT_TMP1, 0,
+	    SLJIT_MEM1(BPFJIT_BUF), pc->k);
 	if (status != SLJIT_SUCCESS)
 		return compiler->error;
 
 	/* tmp2 = buf[pc->k+1] */
 	status = sljit_emit_op1(compiler,
 	    SLJIT_MOV_UB,
-	    BPF_SLJIT_TMP2, 0,
-	    SLJIT_MEM1(BPF_SLJIT_BUF), pc->k+1);
+	    BPFJIT_TMP2, 0,
+	    SLJIT_MEM1(BPFJIT_BUF), pc->k+1);
 	if (status != SLJIT_SUCCESS)
 		return compiler->error;
 
 	/* tmp1 <<= 8 */
 	status = sljit_emit_op2(compiler,
 	    SLJIT_SHL,
-	    BPF_SLJIT_TMP1, 0,
-	    BPF_SLJIT_TMP1, 0,
+	    BPFJIT_TMP1, 0,
+	    BPFJIT_TMP1, 0,
 	    SLJIT_IMM, 8);
 	if (status != SLJIT_SUCCESS)
 		return compiler->error;
@@ -80,9 +79,9 @@ emit_read16(struct sljit_compiler* compiler, struct bpf_insn *pc)
 	/* A = tmp1 + tmp2 */
 	status = sljit_emit_op2(compiler,
 	    SLJIT_ADD,
-	    BPF_SLJIT_A, 0,
-	    BPF_SLJIT_TMP1, 0,
-	    BPF_SLJIT_TMP2, 0);
+	    BPFJIT_A, 0,
+	    BPFJIT_TMP1, 0,
+	    BPFJIT_TMP2, 0);
 	return status;
 }
 
@@ -94,32 +93,32 @@ emit_read32(struct sljit_compiler* compiler, struct bpf_insn *pc)
 	/* tmp1 = buf[pc->k] */
 	status = sljit_emit_op1(compiler,
 	    SLJIT_MOV_UB,
-	    BPF_SLJIT_TMP1, 0,
-	    SLJIT_MEM1(BPF_SLJIT_BUF), pc->k);
+	    BPFJIT_TMP1, 0,
+	    SLJIT_MEM1(BPFJIT_BUF), pc->k);
 	if (status != SLJIT_SUCCESS)
 		return compiler->error;
 
 	/* tmp2 = buf[pc->k+1] */
 	status = sljit_emit_op1(compiler,
 	    SLJIT_MOV_UB,
-	    BPF_SLJIT_TMP2, 0,
-	    SLJIT_MEM1(BPF_SLJIT_BUF), pc->k+1);
+	    BPFJIT_TMP2, 0,
+	    SLJIT_MEM1(BPFJIT_BUF), pc->k+1);
 	if (status != SLJIT_SUCCESS)
 		return compiler->error;
 
 	/* A = buf[pc->k+3] */
 	status = sljit_emit_op1(compiler,
 	    SLJIT_MOV_UB,
-	    BPF_SLJIT_A, 0,
-	    SLJIT_MEM1(BPF_SLJIT_BUF), pc->k+3);
+	    BPFJIT_A, 0,
+	    SLJIT_MEM1(BPFJIT_BUF), pc->k+3);
 	if (status != SLJIT_SUCCESS)
 		return compiler->error;
 
 	/* tmp1 <<= 24 */
 	status = sljit_emit_op2(compiler,
 	    SLJIT_SHL,
-	    BPF_SLJIT_TMP1, 0,
-	    BPF_SLJIT_TMP1, 0,
+	    BPFJIT_TMP1, 0,
+	    BPFJIT_TMP1, 0,
 	    SLJIT_IMM, 24);
 	if (status != SLJIT_SUCCESS)
 		return compiler->error;
@@ -127,25 +126,25 @@ emit_read32(struct sljit_compiler* compiler, struct bpf_insn *pc)
 	/* A = A + tmp1 */
 	status = sljit_emit_op2(compiler,
 	    SLJIT_ADD,
-	    BPF_SLJIT_A, 0,
-	    BPF_SLJIT_A, 0,
-		BPF_SLJIT_TMP1, 0);
+	    BPFJIT_A, 0,
+	    BPFJIT_A, 0,
+		BPFJIT_TMP1, 0);
 	if (status != SLJIT_SUCCESS)
 		return compiler->error;
 
 	/* tmp1 = buf[pc->k+2] */
 	status = sljit_emit_op1(compiler,
 	    SLJIT_MOV_UB,
-	    BPF_SLJIT_TMP1, 0,
-	    SLJIT_MEM1(BPF_SLJIT_BUF), pc->k+2);
+	    BPFJIT_TMP1, 0,
+	    SLJIT_MEM1(BPFJIT_BUF), pc->k+2);
 	if (status != SLJIT_SUCCESS)
 		return compiler->error;
 
 	/* tmp2 <<= 16 */
 	status = sljit_emit_op2(compiler,
 	    SLJIT_SHL,
-	    BPF_SLJIT_TMP2, 0,
-	    BPF_SLJIT_TMP2, 0,
+	    BPFJIT_TMP2, 0,
+	    BPFJIT_TMP2, 0,
 	    SLJIT_IMM, 16);
 	if (status != SLJIT_SUCCESS)
 		return compiler->error;
@@ -153,17 +152,17 @@ emit_read32(struct sljit_compiler* compiler, struct bpf_insn *pc)
 	/* A = A + tmp2 */
 	status = sljit_emit_op2(compiler,
 	    SLJIT_ADD,
-	    BPF_SLJIT_A, 0,
-	    BPF_SLJIT_A, 0,
-		BPF_SLJIT_TMP2, 0);
+	    BPFJIT_A, 0,
+	    BPFJIT_A, 0,
+		BPFJIT_TMP2, 0);
 	if (status != SLJIT_SUCCESS)
 		return compiler->error;
 
 	/* tmp1 <<= 8 */
 	status = sljit_emit_op2(compiler,
 	    SLJIT_SHL,
-	    BPF_SLJIT_TMP1, 0,
-	    BPF_SLJIT_TMP1, 0,
+	    BPFJIT_TMP1, 0,
+	    BPFJIT_TMP1, 0,
 	    SLJIT_IMM, 8);
 	if (status != SLJIT_SUCCESS)
 		return compiler->error;
@@ -171,9 +170,9 @@ emit_read32(struct sljit_compiler* compiler, struct bpf_insn *pc)
 	/* A = A + tmp1 */
 	status = sljit_emit_op2(compiler,
 	    SLJIT_ADD,
-	    BPF_SLJIT_A, 0,
-	    BPF_SLJIT_A, 0,
-		BPF_SLJIT_TMP1, 0);
+	    BPFJIT_A, 0,
+	    BPFJIT_A, 0,
+		BPFJIT_TMP1, 0);
 	return status;
 }
 
@@ -269,10 +268,10 @@ bpf_jmp_to_sljit_cond_inverted(struct bpf_insn *pc)
 	}
 }
 
-const void *
+void *
 bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 {
-	const void *rv;
+	void *rv;
 	size_t i;
 	size_t width;
 	struct sljit_label *label;
@@ -323,7 +322,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	}
 
 	sljit_emit_enter(compiler, 3, 3, 3, BPF_MEMWORDS * sizeof(uint32_t));
-	sljit_emit_op1(compiler, SLJIT_MOV, BPF_SLJIT_A, 0, SLJIT_IMM, 0);
+	sljit_emit_op1(compiler, SLJIT_MOV, BPFJIT_A, 0, SLJIT_IMM, 0);
 
 	for (i = 0; i < insn_count; i++) {
 		struct bpf_insn *pc = &insns[i];
@@ -347,7 +346,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			if (BPF_RVAL(pc->code) == BPF_K) {
 				sljit_emit_op1(compiler,
 				    SLJIT_MOV,
-				    BPF_SLJIT_A, 0,
+				    BPFJIT_A, 0,
 				    SLJIT_IMM, pc->k);
 			}
 
@@ -376,7 +375,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				    compiler,
 				    SLJIT_C_GREATER,
 				    SLJIT_IMM, pc->k + width,
-				    BPF_SLJIT_BUFLEN, 0);
+				    BPFJIT_BUFLEN, 0);
 
 				switch (width) {
 				case 4:
@@ -409,7 +408,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 					    compiler,
 					    bpf_jmp_to_sljit_cond_inverted(pc),
 					    SLJIT_IMM, pc->k,
-					    BPF_SLJIT_A, 0);
+					    BPFJIT_A, 0);
 
 					SLIST_INSERT_HEAD(&jumps[i + 1 + pc->jf],
 					    jump, bj_entries);
@@ -429,7 +428,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			sljit_set_label(returns[i], label);
 	}
 
-	sljit_emit_return(compiler, BPF_SLJIT_A, 0);
+	sljit_emit_return(compiler, BPFJIT_A, 0);
 
 	if (outofbounds_size > 0) {
 		label = sljit_emit_label(compiler);
@@ -466,4 +465,10 @@ fail:
 		free(outofbounds);
 
 	return rv;
+}
+
+void
+bpfjit_free_code(void *code)
+{
+	free((void *)code);
 }
