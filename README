@@ -1,4 +1,4 @@
 Just-in-Time compilation for Berkeley Packet Filter.
 
-You need sljit (http://sljit.sourceforge.net/) to build
-bpfjit.
+You need sljit (http://sljit.sourceforge.net/) and mk-configure
+(http://sourceforge.net/projects/mk-configure/) to build bpfjit.
