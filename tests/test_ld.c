@@ -27,43 +27,56 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _NET_BPFJIT_H_
-#define _NET_BPFJIT_H_
+#include <bpfjit.h>
 
-#include <inttypes.h>
-#include <stddef.h>
-#include <sys/queue.h>
-#include <sys/types.h>
+#include "util.h"
 
-#ifdef __linux
-#include <pcap-bpf.h>
-#else
-#include <net/bpf.h>
-#endif
-
-#include <sljitLir.h>
-
-
-#define BPFJIT_A	SLJIT_RETURN_REG
-#define BPFJIT_X	SLJIT_TEMPORARY_REG1
-#define BPFJIT_TMP1	SLJIT_TEMPORARY_REG2
-#define BPFJIT_TMP2	SLJIT_TEMPORARY_REG3
-#define BPFJIT_BUF	SLJIT_GENERAL_REG1
-#define BPFJIT_WIRELEN	SLJIT_GENERAL_REG2
-#define BPFJIT_BUFLEN	SLJIT_GENERAL_REG3
-
-
-struct bpfjit_jump
-{
-	struct sljit_jump *bj_jump;
-	SLIST_ENTRY(bpfjit_jump) bj_entries;
+static struct bpf_insn insns_abs[3][2] = {
+	{
+		BPF_STMT(BPF_LD+BPF_B+BPF_ABS, 5),
+		BPF_STMT(BPF_RET+BPF_A, 0)
+	},
+	{
+		BPF_STMT(BPF_LD+BPF_H+BPF_ABS, 5),
+		BPF_STMT(BPF_RET+BPF_A, 0)
+	},
+	{
+		BPF_STMT(BPF_LD+BPF_W+BPF_ABS, 5),
+		BPF_STMT(BPF_RET+BPF_A, 0)
+	}
 };
 
-void *bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count);
-void bpfjit_free_code(void *code);
+static void
+test_ld_abs(void)
+{
+	int i, l;
+	static uint8_t pkt[] = { 0, 0xf1, 2, 0xf3, 4, 0x3d, 0xe9, 0x8d, 0xb5 };
+	static size_t lengths[3] = { 1, 2, 4 };
+	static unsigned int expected[3] = { 0x3d, 0x3de9, 0x3de98db5 };
+	size_t insn_count = sizeof(insns_abs[0]) / sizeof(insns_abs[0][0]);
 
-unsigned int
-bpfjit_execute_code(const uint8_t *p, unsigned int wirelen,
-    unsigned int buflen, const void *code);
+	for (i = 0; i < 3; i++) {
+		void *code;
 
-#endif /* !_NET_BPFJIT_H_ */
+		REQUIRE(bpf_validate(insns_abs[i], insn_count));
+
+		code = bpfjit_generate_code(insns_abs[i], insn_count);
+		REQUIRE(code != NULL);
+
+		for (l = 0; l < 5 + lengths[i]; l++)
+			CHECK(bpfjit_execute_code(pkt, l, l, code) == 0);
+
+		l = 5 + lengths[i];
+		CHECK(bpfjit_execute_code(pkt, l, l, code) == expected[i]);
+
+		l = sizeof(pkt);
+		CHECK(bpfjit_execute_code(pkt, l, l, code) == expected[i]);
+
+		bpfjit_free_code(code);
+	}
+}
+
+void test_ld(void)
+{
+	test_ld_abs();
+}
