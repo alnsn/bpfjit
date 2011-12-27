@@ -50,9 +50,9 @@ static void
 test_ld_abs(void)
 {
 	int i, l;
-	static uint8_t pkt[] = { 0, 0xf1, 2, 0xf3, 4, 0x3d, 0xe9, 0x8d, 0xb5 };
+	static uint8_t pkt[] = { 0, 0xf1, 2, 0xf3, 4, 0xde, 0xad, 0xbe, 0xef };
 	static size_t lengths[3] = { 1, 2, 4 };
-	static unsigned int expected[3] = { 0x3d, 0x3de9, 0x3de98db5 };
+	static unsigned int expected[3] = { 0xde, 0xdead, 0xdeadbeef };
 	size_t insn_count = sizeof(insns_abs[0]) / sizeof(insns_abs[0][0]);
 
 	for (i = 0; i < 3; i++) {
