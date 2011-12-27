@@ -190,19 +190,27 @@ emit_ld_w_abs(struct sljit_compiler* compiler, struct bpf_insn *pc)
 }
 
 /*
- * Count BPF_LD and BPF_LDX instructions.
- * XXX count only loads from memory
+ * Count out-of-bounds jumps in BPF_LD and BPF_LDX instructions.
  */
 static size_t
-count_load_insns(struct bpf_insn *insns, size_t insn_count)
+count_oob_jumps(struct bpf_insn *insns, size_t insn_count)
 {
 	size_t rv = 0;
 	struct bpf_insn *pc;
 
 	for (pc = insns; pc != insns + insn_count; pc++) {
-		unsigned int class = BPF_CLASS(pc->code);
-		if (class == BPF_LD || class == BPF_LDX)
-			rv++;
+		switch (BPF_CLASS(pc->code)) {
+		case BPF_LD:
+			switch (BPF_MODE(pc->code)) {
+			case BPF_ABS: rv += 1; break;
+			case BPF_IND: rv += 2; break;
+			}
+			break;
+		case BPF_LDX:
+			if (pc->code & BPF_MSH)
+				rv++;
+			break;
+		}
 	}
 
 	return rv;
@@ -283,7 +291,7 @@ bpf_jmp_to_sljit_cond_inverted(struct bpf_insn *pc)
 }
 
 static int
-ld_width(struct bpf_insn *pc)
+read_width(struct bpf_insn *pc)
 {
 
 	switch (BPF_SIZE(pc->code)) {
@@ -322,7 +330,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	size_t i;
 	int status;
 	int width;
-	int rval, mode;
+	unsigned int rval, mode;
 	int num_used_memwords;
 	struct sljit_compiler* compiler;
 
@@ -366,7 +374,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	}
 
 	oob_size = 0;
-	oob_maxsize = 2 * count_load_insns(insns, insn_count); /* XXX get rid of 2 */
+	oob_maxsize = count_oob_jumps(insns, insn_count);
 	if (oob_maxsize > 0) {
 		oob = calloc(oob_maxsize, sizeof(oob[0]));
 		if (oob == NULL)
@@ -435,7 +443,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 
 		case BPF_LD:
 			mode = BPF_MODE(pc->code);
-			width = ld_width(pc);
+			width = read_width(pc);
 			if (width == -1)
 				goto fail;
 
@@ -614,7 +622,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 		} /* switch */
 	} /* main loop */
 
-	assert(oob_size <= oob_maxsize); /* XXX change to == */
+	assert(oob_size == oob_maxsize);
 	assert(returns_maxsize - returns_size <= 1);
 
 	if (returns_size > 0) {
