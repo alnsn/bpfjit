@@ -36,7 +36,9 @@
 #include <sys/queue.h>
 #include <sys/types.h>
 
-/* XXX check rv of sljit calls */
+#if defined(SLJIT_VERBOSE) && SLJIT_VERBOSE
+#include <stdio.h> /* for stderr */
+#endif
 
 /*
  * Generate code for BPF_LD+BPF_B+BPF_ABS    A <- P[k:1].
@@ -59,32 +61,32 @@ emit_ld_h_abs(struct sljit_compiler* compiler, struct bpf_insn *pc)
 {
 	int status;
 
-	/* tmp1 = buf[pc->k] */
+	/* tmp1 = buf[pc->k]; */
 	status = sljit_emit_op1(compiler,
 	    SLJIT_MOV_UB,
 	    BPFJIT_TMP1, 0,
 	    SLJIT_MEM1(BPFJIT_BUF), pc->k);
 	if (status != SLJIT_SUCCESS)
-		return compiler->error;
+		return status;
 
-	/* tmp2 = buf[pc->k+1] */
+	/* tmp2 = buf[pc->k+1]; */
 	status = sljit_emit_op1(compiler,
 	    SLJIT_MOV_UB,
 	    BPFJIT_TMP2, 0,
 	    SLJIT_MEM1(BPFJIT_BUF), pc->k+1);
 	if (status != SLJIT_SUCCESS)
-		return compiler->error;
+		return status;
 
-	/* tmp1 <<= 8 */
+	/* tmp1 = tmp1 << 8; */
 	status = sljit_emit_op2(compiler,
 	    SLJIT_SHL,
 	    BPFJIT_TMP1, 0,
 	    BPFJIT_TMP1, 0,
 	    SLJIT_IMM, 8);
 	if (status != SLJIT_SUCCESS)
-		return compiler->error;
+		return status;
 
-	/* A = tmp1 + tmp2 */
+	/* A = tmp1 + tmp2; */
 	status = sljit_emit_op2(compiler,
 	    SLJIT_ADD,
 	    BPFJIT_A, 0,
@@ -101,84 +103,84 @@ emit_ld_w_abs(struct sljit_compiler* compiler, struct bpf_insn *pc)
 {
 	int status;
 
-	/* tmp1 = buf[pc->k] */
+	/* tmp1 = buf[pc->k]; */
 	status = sljit_emit_op1(compiler,
 	    SLJIT_MOV_UB,
 	    BPFJIT_TMP1, 0,
 	    SLJIT_MEM1(BPFJIT_BUF), pc->k);
 	if (status != SLJIT_SUCCESS)
-		return compiler->error;
+		return status;
 
-	/* tmp2 = buf[pc->k+1] */
+	/* tmp2 = buf[pc->k+1]; */
 	status = sljit_emit_op1(compiler,
 	    SLJIT_MOV_UB,
 	    BPFJIT_TMP2, 0,
 	    SLJIT_MEM1(BPFJIT_BUF), pc->k+1);
 	if (status != SLJIT_SUCCESS)
-		return compiler->error;
+		return status;
 
-	/* A = buf[pc->k+3] */
+	/* A = buf[pc->k+3]; */
 	status = sljit_emit_op1(compiler,
 	    SLJIT_MOV_UB,
 	    BPFJIT_A, 0,
 	    SLJIT_MEM1(BPFJIT_BUF), pc->k+3);
 	if (status != SLJIT_SUCCESS)
-		return compiler->error;
+		return status;
 
-	/* tmp1 <<= 24 */
+	/* tmp1 = tmp1 << 24; */
 	status = sljit_emit_op2(compiler,
 	    SLJIT_SHL,
 	    BPFJIT_TMP1, 0,
 	    BPFJIT_TMP1, 0,
 	    SLJIT_IMM, 24);
 	if (status != SLJIT_SUCCESS)
-		return compiler->error;
+		return status;
 
-	/* A = A + tmp1 */
+	/* A = A + tmp1; */
 	status = sljit_emit_op2(compiler,
 	    SLJIT_ADD,
 	    BPFJIT_A, 0,
 	    BPFJIT_A, 0,
 	    BPFJIT_TMP1, 0);
 	if (status != SLJIT_SUCCESS)
-		return compiler->error;
+		return status;
 
-	/* tmp1 = buf[pc->k+2] */
+	/* tmp1 = buf[pc->k+2]; */
 	status = sljit_emit_op1(compiler,
 	    SLJIT_MOV_UB,
 	    BPFJIT_TMP1, 0,
 	    SLJIT_MEM1(BPFJIT_BUF), pc->k+2);
 	if (status != SLJIT_SUCCESS)
-		return compiler->error;
+		return status;
 
-	/* tmp2 <<= 16 */
+	/* tmp2 = tmp2 << 16; */
 	status = sljit_emit_op2(compiler,
 	    SLJIT_SHL,
 	    BPFJIT_TMP2, 0,
 	    BPFJIT_TMP2, 0,
 	    SLJIT_IMM, 16);
 	if (status != SLJIT_SUCCESS)
-		return compiler->error;
+		return status;
 
-	/* A = A + tmp2 */
+	/* A = A + tmp2; */
 	status = sljit_emit_op2(compiler,
 	    SLJIT_ADD,
 	    BPFJIT_A, 0,
 	    BPFJIT_A, 0,
 		BPFJIT_TMP2, 0);
 	if (status != SLJIT_SUCCESS)
-		return compiler->error;
+		return status;
 
-	/* tmp1 <<= 8 */
+	/* tmp1 = tmp1 << 8; */
 	status = sljit_emit_op2(compiler,
 	    SLJIT_SHL,
 	    BPFJIT_TMP1, 0,
 	    BPFJIT_TMP1, 0,
 	    SLJIT_IMM, 8);
 	if (status != SLJIT_SUCCESS)
-		return compiler->error;
+		return status;
 
-	/* A = A + tmp1 */
+	/* A = A + tmp1; */
 	status = sljit_emit_op2(compiler,
 	    SLJIT_ADD,
 	    BPFJIT_A, 0,
@@ -189,6 +191,7 @@ emit_ld_w_abs(struct sljit_compiler* compiler, struct bpf_insn *pc)
 
 /*
  * Count BPF_LD and BPF_LDX instructions.
+ * XXX count only loads from memory
  */
 static size_t
 count_load_insns(struct bpf_insn *insns, size_t insn_count)
@@ -279,25 +282,73 @@ bpf_jmp_to_sljit_cond_inverted(struct bpf_insn *pc)
 	}
 }
 
+static int
+ld_width(struct bpf_insn *pc)
+{
+
+	switch (BPF_SIZE(pc->code)) {
+	case BPF_W:
+		return 4;
+	case BPF_H:
+		return 2;
+	case BPF_B:
+		return 1;
+	default:
+		return -1;
+	}
+}
+
+static bool
+skip_A_init(struct bpf_insn *insns, size_t insn_count)
+{
+
+	/* XXX implement */
+	return false;
+}
+
+static bool
+skip_X_init(struct bpf_insn *insns, size_t insn_count)
+{
+
+	/* XXX implement */
+	return false;
+}
+
+
 void *
 bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 {
 	void *rv;
 	size_t i;
-	size_t width;
+	int status;
+	int width;
+	int rval, mode;
+	int num_used_memwords;
 	struct sljit_compiler* compiler;
-	struct sljit_label *label;
+
+	/* jumps[pc-insns] stores a list of jumps to instruction pc */
 	SLIST_HEAD(, bpfjit_jump) *jumps;
+
+	/* a list of jumps to a normal return from a generated function */
 	struct sljit_jump **returns;
-	struct sljit_jump **outofbounds;
-	size_t returns_size, returns_capacity;
-	size_t outofbounds_size, outofbounds_capacity;
+	size_t returns_size, returns_maxsize;
+
+	/* a list of jumps to out-of-bound return from a generated function */
+	struct sljit_jump **oob;
+	size_t oob_size, oob_maxsize;
+
+	/* for local use */
+	struct sljit_label *label;
+	struct sljit_jump *jump;
+	struct bpfjit_jump *bjump;
 
 	rv = NULL;
 	compiler = NULL;
 	jumps = NULL;
 	returns = NULL;
-	outofbounds = NULL;
+	oob = NULL;
+
+	num_used_memwords = 0; /* XXX implement */
 
 	jumps = calloc(insn_count, sizeof(jumps[0]));
 	if (jumps == NULL)
@@ -307,20 +358,18 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 		SLIST_INIT(&jumps[i]);
 
 	returns_size = 0;
-	returns_capacity = count_ret_insns(insns, insn_count);
-	if (returns_capacity > 0) {
-		returns = calloc(returns_capacity,
-		    sizeof(returns[0]));
+	returns_maxsize = count_ret_insns(insns, insn_count);
+	if (returns_maxsize > 0) {
+		returns = calloc(returns_maxsize, sizeof(returns[0]));
 		if (returns == NULL)
 			goto fail;
 	}
 
-	outofbounds_size = 0;
-	outofbounds_capacity = count_load_insns(insns, insn_count);
-	if (outofbounds_capacity > 0) {
-		outofbounds = calloc(outofbounds_capacity,
-		    sizeof(outofbounds[0]));
-		if (outofbounds == NULL)
+	oob_size = 0;
+	oob_maxsize = 2 * count_load_insns(insns, insn_count); /* XXX get rid of 2 */
+	if (oob_maxsize > 0) {
+		oob = calloc(oob_maxsize, sizeof(oob[0]));
+		if (oob == NULL)
 			goto fail;
 	}
 
@@ -332,62 +381,107 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	sljit_compiler_verbose(compiler, stderr);
 #endif
 
-	sljit_emit_enter(compiler, 3, 3, 3, BPF_MEMWORDS * sizeof(uint32_t));
-	sljit_emit_op1(compiler, SLJIT_MOV, BPFJIT_A, 0, SLJIT_IMM, 0);
+	status = sljit_emit_enter(compiler, 3, 4, 3,
+	    num_used_memwords * sizeof(uint32_t));
+	if (status != SLJIT_SUCCESS)
+		goto fail;
+
+	if (!skip_A_init(insns, insn_count)) {
+		/* A = 0; */
+		status = sljit_emit_op1(compiler,
+		    SLJIT_MOV,
+		    BPFJIT_A, 0,
+		    SLJIT_IMM, 0);
+		if (status != SLJIT_SUCCESS)
+			goto fail;
+	}
+
+	if (!skip_X_init(insns, insn_count)) {
+		/* X = 0; */
+		status = sljit_emit_op1(compiler,
+		    SLJIT_MOV,
+		    BPFJIT_X, 0,
+		    SLJIT_IMM, 0);
+		if (status != SLJIT_SUCCESS)
+			goto fail;
+	}
 
 	for (i = 0; i < insn_count; i++) {
 		struct bpf_insn *pc = &insns[i];
 
+		/*
+		 * Resolve jumps to pc and remove not anymore
+		 * needed bpfjit_jump entries from the list.
+		 */
 		if (!SLIST_EMPTY(&jumps[i])) {
-			struct bpfjit_jump *jump;
-
 			label = sljit_emit_label(compiler);
 			if (label == NULL)
 				goto fail;
-			SLIST_FOREACH(jump, &jumps[i], bj_entries)
-				sljit_set_label(jump->bj_jump, label);
+			while (!SLIST_EMPTY(&jumps[i])) {
+				bjump = SLIST_FIRST(&jumps[i]);
+				sljit_set_label(bjump->bj_jump, label);
+				free(bjump);
+				SLIST_REMOVE_HEAD(&jumps[i], bj_entries);
+			}
 		}
 
+		/*
+		 * Command dispatcher.
+		 */
 		switch (BPF_CLASS(pc->code)) {
 
 		default:
 			goto fail;
 
-		case BPF_RET:
-			if (BPF_RVAL(pc->code) == BPF_K) {
-				sljit_emit_op1(compiler,
-				    SLJIT_MOV,
-				    BPFJIT_A, 0,
-				    SLJIT_IMM, pc->k);
-			}
-
-			/* XXX BPF_X is mentioned in bpf.h but not in man */
-
-			if (pc != &insns[insn_count - 1]) {
-				returns[returns_size++] = sljit_emit_jump(
-				    compiler, SLJIT_JUMP);
-			}
-
-			continue;
-
 		case BPF_LD:
-			switch (BPF_SIZE(pc->code)) {
-			case BPF_W: width = 4; break;
-			case BPF_H: width = 2; break;
-			case BPF_B: width = 1; break;
-			default:
+			mode = BPF_MODE(pc->code);
+			width = ld_width(pc);
+			if (width == -1)
 				goto fail;
+
+			if (mode == BPF_IND) {
+				/* if (X > buflen) return 0; */
+				jump = sljit_emit_cmp(compiler,
+				    SLJIT_C_GREATER,
+				    BPFJIT_X, 0,
+				    BPFJIT_BUFLEN, 0);
+				if (jump == NULL)
+					goto fail;
+				oob[oob_size++] = jump;
+
+				/* temporarily do buf += X; buflen -= X; */
+				status = sljit_emit_op2(compiler,
+				    SLJIT_ADD,
+				    BPFJIT_BUF, 0,
+				    BPFJIT_BUF, 0,
+				    BPFJIT_X, 0);
+				if (status != SLJIT_SUCCESS)
+					goto fail;
+
+				status = sljit_emit_op2(compiler,
+				    SLJIT_SUB,
+				    BPFJIT_BUFLEN, 0,
+				    BPFJIT_BUFLEN, 0,
+				    BPFJIT_X, 0);
+				if (status != SLJIT_SUCCESS)
+					goto fail;
 			}
 
-			if (BPF_MODE(pc->code) == BPF_ABS) {
-				int status;
-
-				outofbounds[outofbounds_size++] = sljit_emit_cmp(
-				    compiler,
+			/* if (pc->k + width > buflen) return 0; */
+			if (mode == BPF_ABS || mode == BPF_IND) {
+				/* overflow check for pc->k + width */
+				if (pc->k > UINT32_MAX - width)
+					goto fail;
+				jump = sljit_emit_cmp(compiler,
 				    SLJIT_C_GREATER,
-				    SLJIT_IMM, pc->k + width,
+				    SLJIT_IMM, pc->k + (uint32_t)width,
 				    BPFJIT_BUFLEN, 0);
+				if (jump == NULL)
+					goto fail;
+				oob[oob_size++] = jump;
+			}
 
+			if (mode == BPF_ABS || mode == BPF_IND) {
 				switch (width) {
 				case 4:
 					status = emit_ld_w_abs(compiler, pc);
@@ -399,57 +493,160 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 					status = emit_ld_b_abs(compiler, pc);
 					break;
 				}
-
 				if (status != SLJIT_SUCCESS)
 					goto fail;
+			}
+
+			/* restore buf and buflen values: buf -= X; buflen += X; */
+			if (mode == BPF_IND) {
+				status = sljit_emit_op2(compiler,
+				    SLJIT_SUB,
+				    BPFJIT_BUF, 0,
+				    BPFJIT_BUF, 0,
+				    BPFJIT_X, 0);
+				if (status != SLJIT_SUCCESS)
+					goto fail;
+
+				status = sljit_emit_op2(compiler,
+				    SLJIT_ADD,
+				    BPFJIT_BUFLEN, 0,
+				    BPFJIT_BUFLEN, 0,
+				    BPFJIT_X, 0);
+				if (status != SLJIT_SUCCESS)
+					goto fail;
+			}
+
+			/*
+			 * XXX implement
+			 * BPF_LD+BPF_W+BPF_LEN    A <- len
+			 * BPF_LD+BPF_IMM          A <- k
+			 * BPF_LD+BPF_MEM          A <- M[k]
+			 */
+
+			continue;
+
+		case BPF_LDX:
+			mode = BPF_MODE(pc->code);
+
+			/* BPF_LDX+BPF_W+BPF_IMM    X <- k */
+			if (mode == BPF_IMM) {
+				if (BPF_SIZE(pc->code) != BPF_W)
+					goto fail;
+				status = sljit_emit_op1(compiler,
+				    SLJIT_MOV,
+				    BPFJIT_X, 0,
+				    SLJIT_IMM, pc->k);
+				if (status != SLJIT_SUCCESS)
+					goto fail;
+			}
+
+			/*
+			 * XXX implement
+			 * BPF_LDX+BPF_W+BPF_MEM    X <- M[k]
+			 * BPF_LDX+BPF_W+BPF_LEN    X <- len
+			 * BPF_LDX+BPF_B+BPF_MSH    X <- 4*(P[k:1]&0xf)
+			 */
+
+			continue;
+
+		case BPF_RET:
+			rval = BPF_RVAL(pc->code);
+			if (rval == BPF_X)
+				goto fail;
+
+			/* BPF_RET+BPF_K    accept k bytes */
+			if (rval == BPF_K) {
+				status = sljit_emit_op1(compiler,
+				    SLJIT_MOV,
+				    BPFJIT_A, 0,
+				    SLJIT_IMM, pc->k);
+				if (status != SLJIT_SUCCESS)
+					goto fail;
+			}
+
+			/* BPF_RET+BPF_A    accept A bytes */
+			if (rval == BPF_A) {
+#if BPFJIT_A != SLJIT_RETURN_REG
+				status = sljit_emit_op1(compiler,
+				    SLJIT_MOV,
+				    SLJIT_RETURN_REG, 0,
+				    BPFJIT_A, 0);
+				if (status != SLJIT_SUCCESS)
+					goto fail;
+#endif
+			}
+
+			/*
+			 * Save a jump to a normal return. If the program
+			 * ends with BPF_RET, no jump is needed because
+			 * the normal return is generated right after the
+			 * last instruction.
+			 */
+			if (i != insn_count - 1) {
+				jump = sljit_emit_jump(compiler, SLJIT_JUMP);
+				if (jump == NULL)
+					goto fail;
+				returns[returns_size++] = jump;
 			}
 
 			continue;
 
 		case BPF_JMP:
 			if (BPF_SRC(pc->code) == BPF_K) {
-				struct bpfjit_jump *jump;
-
-				jump = malloc(sizeof(struct bpfjit_jump));
-				if (jump == NULL)
+				bjump = malloc(sizeof(struct bpfjit_jump));
+				if (bjump == NULL)
 					goto fail;
 
 				if (pc->jt == 0) {
-					jump->bj_jump = sljit_emit_cmp(
+					bjump->bj_jump = sljit_emit_cmp(
 					    compiler,
 					    bpf_jmp_to_sljit_cond_inverted(pc),
 					    SLJIT_IMM, pc->k,
 					    BPFJIT_A, 0);
-
 					SLIST_INSERT_HEAD(&jumps[i + 1 + pc->jf],
-					    jump, bj_entries);
-					if (jump->bj_jump == NULL)
+					    bjump, bj_entries);
+					if (bjump->bj_jump == NULL)
 						goto fail;
 				}
 			}
 
 			continue;
+		} /* switch */
+	} /* main loop */
 
-		}
-	}
+	assert(oob_size <= oob_maxsize); /* XXX change to == */
+	assert(returns_maxsize - returns_size <= 1);
 
 	if (returns_size > 0) {
 		label = sljit_emit_label(compiler);
+		if (label == NULL)
+			goto fail;
 		for (i = 0; i < returns_size; i++)
 			sljit_set_label(returns[i], label);
 	}
 
-	sljit_emit_return(compiler, BPFJIT_A, 0);
+	status = sljit_emit_return(compiler, BPFJIT_A, 0);
+	if (status != SLJIT_SUCCESS)
+		goto fail;
 
-	if (outofbounds_size > 0) {
+	if (oob_size > 0) {
 		label = sljit_emit_label(compiler);
+		if (label == NULL)
+			goto fail;
 
-		for (i = 0; i < outofbounds_size; i++)
-			sljit_set_label(outofbounds[i], label);
+		for (i = 0; i < oob_size; i++)
+			sljit_set_label(oob[i], label);
 
-		sljit_emit_op1(compiler, SLJIT_MOV,
-		    SLJIT_RETURN_REG, 0, SLJIT_IMM, 0);
-		sljit_emit_return(compiler, SLJIT_RETURN_REG, 0);
+		status = sljit_emit_op1(compiler,
+		    SLJIT_MOV,
+		    SLJIT_RETURN_REG, 0,
+		    SLJIT_IMM, 0);
+		if (status != SLJIT_SUCCESS)
+			goto fail;
+
+		status = sljit_emit_return(compiler, SLJIT_RETURN_REG, 0);
+		if (status != SLJIT_SUCCESS)
+			goto fail;
 	}
 
 	rv = sljit_generate_code(compiler);
@@ -472,8 +669,8 @@ fail:
 	if (returns != NULL)
 		free(returns);
 
-	if (outofbounds != NULL)
-		free(outofbounds);
+	if (oob != NULL)
+		free(oob);
 
 	return rv;
 }

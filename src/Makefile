@@ -10,7 +10,7 @@ SHLIB_MAJOR=	1
 SHLIB_MINOR=	0
 SHLIB_TEENY=	0
 
-COPTS+=		-O2 -g
+COPTS+=		-g
 CPPFLAGS+=	-DSLJIT_CONFIG_AUTO=1
 CPPFLAGS+=	-I ../../sljit/sljit_src/
 # XXX		^^^^^^^^^^^^^^^^^^^^^^^^^

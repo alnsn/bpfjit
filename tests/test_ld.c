@@ -46,11 +46,30 @@ static struct bpf_insn insns_abs[3][2] = {
 	}
 };
 
+static struct bpf_insn insns_ind[3][3] = {
+	{
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 3),
+		BPF_STMT(BPF_LD+BPF_B+BPF_IND, 2),
+		BPF_STMT(BPF_RET+BPF_A, 0)
+	},
+	{
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 3),
+		BPF_STMT(BPF_LD+BPF_H+BPF_IND, 2),
+		BPF_STMT(BPF_RET+BPF_A, 0)
+	},
+	{
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 3),
+		BPF_STMT(BPF_LD+BPF_W+BPF_IND, 2),
+		BPF_STMT(BPF_RET+BPF_A, 0)
+	}
+};
+
+
 static void
 test_ld_abs(void)
 {
 	int i, l;
-	static uint8_t pkt[] = { 0, 0xf1, 2, 0xf3, 4, 0xde, 0xad, 0xbe, 0xef };
+	static uint8_t pkt[] = { 0, 0xf1, 2, 0xf3, 4, 0xde, 0xad, 0xbe, 0xef, 0xff };
 	static size_t lengths[3] = { 1, 2, 4 };
 	static unsigned int expected[3] = { 0xde, 0xdead, 0xdeadbeef };
 	size_t insn_count = sizeof(insns_abs[0]) / sizeof(insns_abs[0][0]);
@@ -76,7 +95,38 @@ test_ld_abs(void)
 	}
 }
 
+static void
+test_ld_ind(void)
+{
+	int i, l;
+	static uint8_t pkt[] = { 0, 0xf1, 2, 0xf3, 4, 0xde, 0xad, 0xbe, 0xef, 0xff };
+	static size_t lengths[3] = { 1, 2, 4 };
+	static unsigned int expected[3] = { 0xde, 0xdead, 0xdeadbeef };
+	size_t insn_count = sizeof(insns_ind[0]) / sizeof(insns_ind[0][0]);
+
+	for (i = 0; i < 3; i++) {
+		void *code;
+
+		REQUIRE(bpf_validate(insns_ind[i], insn_count));
+
+		code = bpfjit_generate_code(insns_ind[i], insn_count);
+		REQUIRE(code != NULL);
+
+		for (l = 0; l < 5 + lengths[i]; l++)
+			CHECK(bpfjit_execute_code(pkt, l, l, code) == 0);
+
+		l = 5 + lengths[i];
+		CHECK(bpfjit_execute_code(pkt, l, l, code) == expected[i]);
+
+		l = sizeof(pkt);
+		CHECK(bpfjit_execute_code(pkt, l, l, code) == expected[i]);
+
+		bpfjit_free_code(code);
+	}
+}
+
 void test_ld(void)
 {
 	test_ld_abs();
+	test_ld_ind();
 }
