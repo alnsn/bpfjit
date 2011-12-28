@@ -1,5 +1,5 @@
 PROG=	test
-SRCS=	main.c util.c test_ld.c
+SRCS=	main.c util.c test_empty.c test_ld.c
 
 COPTS+=		-O2 -g
 CPPFLAGS+=	-I ../src

@@ -27,13 +27,14 @@
  * SUCH DAMAGE.
  */
 
-#include "tests.h"
+#include <bpfjit.h>
+
 #include "util.h"
 
-int main()
-{
-	test_empty();
-	test_ld();
 
-	return exit_status;
+void test_empty(void)
+{
+	struct bpf_insn dummy;
+
+	CHECK(bpfjit_generate_code(&dummy, 0) == NULL);
 }

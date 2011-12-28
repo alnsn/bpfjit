@@ -367,11 +367,12 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 
 	returns_size = 0;
 	returns_maxsize = count_ret_insns(insns, insn_count);
-	if (returns_maxsize > 0) {
-		returns = calloc(returns_maxsize, sizeof(returns[0]));
-		if (returns == NULL)
-			goto fail;
-	}
+	if (returns_maxsize  == 0)
+		goto fail;
+
+	returns = calloc(returns_maxsize, sizeof(returns[0]));
+	if (returns == NULL)
+		goto fail;
 
 	oob_size = 0;
 	oob_maxsize = count_oob_jumps(insns, insn_count);
@@ -623,15 +624,14 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	} /* main loop */
 
 	assert(oob_size == oob_maxsize);
-	assert(returns_maxsize - returns_size <= 1);
+	assert(insn_count > 0 && returns_maxsize == returns_size +
+	    (BPF_CLASS(insns[insn_count-1].code) == BPF_RET) ? 1 : 0);
 
-	if (returns_size > 0) {
-		label = sljit_emit_label(compiler);
-		if (label == NULL)
-			goto fail;
-		for (i = 0; i < returns_size; i++)
-			sljit_set_label(returns[i], label);
-	}
+	label = sljit_emit_label(compiler);
+	if (label == NULL)
+		goto fail;
+	for (i = 0; i < returns_size; i++)
+		sljit_set_label(returns[i], label);
 
 	status = sljit_emit_return(compiler, BPFJIT_A, 0);
 	if (status != SLJIT_SUCCESS)
@@ -660,7 +660,8 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	rv = sljit_generate_code(compiler);
 
 fail:
-	sljit_free_compiler(compiler);
+	if (compiler != NULL)
+		sljit_free_compiler(compiler);
 
 	if (jumps != NULL) {
 		for (i = 0; i < insn_count; i++) {
