@@ -1,4 +1,4 @@
 PROJECTNAME=	bpfjit
-SUBDIR=	src .WAIT test
+SUBDIR=	sljit .WAIT src .WAIT test
 
 .include <mkc.subdir.mk>

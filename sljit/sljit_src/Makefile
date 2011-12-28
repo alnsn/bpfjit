@@ -1,7 +1,7 @@
-LIB=	bpfjit
-SRCS=	bpfjit.c
+LIB=	sljit
+SRCS=	sljitLir.c
 
-WARNS=	4
+#WARNS=	3
 
 MKPICLIB=	yes
 MKSTATICLIB=	yes
@@ -12,9 +12,5 @@ SHLIB_TEENY=	0
 
 COPTS+=		-O2 -g
 CPPFLAGS+=	-DSLJIT_CONFIG_AUTO=1
-CPPFLAGS+=	-I ../sljit/sljit_src/
-
-LDADD+=		-lsljit
-LDFLAGS+=	-L ${.OBJDIR}/../sljit/sljit_src
 
 .include <mkc.lib.mk>
