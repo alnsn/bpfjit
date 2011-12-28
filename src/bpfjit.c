@@ -627,11 +627,13 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	assert(insn_count > 0 && returns_maxsize == returns_size +
 	    (BPF_CLASS(insns[insn_count-1].code) == BPF_RET) ? 1 : 0);
 
-	label = sljit_emit_label(compiler);
-	if (label == NULL)
-		goto fail;
-	for (i = 0; i < returns_size; i++)
-		sljit_set_label(returns[i], label);
+	if (returns_size > 0) {
+		label = sljit_emit_label(compiler);
+		if (label == NULL)
+			goto fail;
+		for (i = 0; i < returns_size; i++)
+			sljit_set_label(returns[i], label);
+	}
 
 	status = sljit_emit_return(compiler, BPFJIT_A, 0);
 	if (status != SLJIT_SUCCESS)
