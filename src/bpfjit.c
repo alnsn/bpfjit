@@ -322,7 +322,6 @@ skip_X_init(struct bpf_insn *insns, size_t insn_count)
 	return false;
 }
 
-
 void *
 bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 {
@@ -703,5 +702,6 @@ bpfjit_execute_code(const uint8_t *p, unsigned int wirelen,
 void
 bpfjit_free_code(void *code)
 {
-	sljit_free_code((void *)code);
+
+	sljit_free_code(code);
 }
