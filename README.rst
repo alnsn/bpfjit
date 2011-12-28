@@ -29,7 +29,11 @@ and install:
 TESTING
 =======
 
-	$ env LD_LIRARY_PATH=${DESTDIR} ${DESTDIR}/bin/bpfjit_test
+	$ export LD_LIBRARY_PATH=${DESTDIR}/lib
+
+	$ cd ${DESTDIR}
+
+	$ ./bin/bpfjit_test
 
 	$ echo $?
 
