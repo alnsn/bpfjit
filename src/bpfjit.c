@@ -234,7 +234,7 @@ count_ret_insns(struct bpf_insn *insns, size_t insn_count)
 }
 
 /*
- * Convert BPF_ALU operations except BPF_DIV to sljit operation.
+ * Convert BPF_ALU operations except BPF_NEG and BPF_DIV to sljit operation.
  */
 static int
 bpf_alu_to_sljit_op(struct bpf_insn *pc)
@@ -244,11 +244,10 @@ bpf_alu_to_sljit_op(struct bpf_insn *pc)
 	case BPF_ADD: return SLJIT_INT_OP|SLJIT_ADD;
 	case BPF_SUB: return SLJIT_INT_OP|SLJIT_SUB;
 	case BPF_MUL: return SLJIT_INT_OP|SLJIT_MUL;
-	case BPF_OR:  return SLJIT_INT_OP|SLJIT_OR;
-	case BPF_AND: return SLJIT_INT_OP|SLJIT_AND;
+	case BPF_OR:  return SLJIT_OR;
+	case BPF_AND: return SLJIT_AND;
 	case BPF_LSH: return SLJIT_INT_OP|SLJIT_SHL;
 	case BPF_RSH: return SLJIT_INT_OP|SLJIT_LSHR; /* XXX or SLJIT_ASHR? */
-	case BPF_NEG: return SLJIT_INT_OP|SLJIT_NOT;
 	default:
 		assert(false);
 	}
