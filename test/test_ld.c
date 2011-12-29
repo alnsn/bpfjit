@@ -165,9 +165,33 @@ test_ld_len(void)
 	bpfjit_free_code(code);
 }
 
+static void
+test_ld_imm(void)
+{
+	static struct bpf_insn insns[] = {
+		BPF_STMT(BPF_LD+BPF_IMM, UINT32_MAX),
+		BPF_STMT(BPF_RET+BPF_A, 0)
+	};
+
+	void *code;
+	uint8_t pkt[1]; /* the program doesn't read any data */
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	REQUIRE(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_MAX);
+
+	bpfjit_free_code(code);
+}
+
 void test_ld(void)
 {
 	test_ld_abs();
 	test_ld_ind();
 	test_ld_len();
+	test_ld_imm();
 }
