@@ -53,12 +53,7 @@ static struct bpf_insn insns[] = {
 	BPF_STMT(BPF_LD+BPF_W+BPF_ABS, 26),
 	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x8003700f, 0, 2),
 	BPF_STMT(BPF_LD+BPF_W+BPF_ABS, 30),
-/* XXX switch to commented out instruction */
-#if 0
 	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x80037023, 3, 4),
-#else
-	BPF_STMT(BPF_LD+BPF_W+BPF_ABS, 30),
-#endif
 	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x80037023, 0, 3),
 	BPF_STMT(BPF_LD+BPF_W+BPF_ABS, 30),
 	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x8003700f, 0, 1),
@@ -66,6 +61,7 @@ static struct bpf_insn insns[] = {
 	BPF_STMT(BPF_RET+BPF_K, 0),
 };
 
+/* XXX change to matching packet */
 static uint8_t pkt[128] = {
 	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0x08, 0x00
 };

@@ -249,25 +249,7 @@ bpf_alu_to_sljit(struct bpf_insn *pc)
 	case BPF_AND: return SLJIT_AND;
 	case BPF_LSH: return SLJIT_SHL;
 	case BPF_RSH: return SLJIT_LSHR; /* XXX or SLJIT_ASHR? */
-	default:
-		assert(false);
-	}
-}
-#endif
-
-#if 0
-/*
- * Convert BPF_JMP operations except BPF_JA and BPF_JSET.
- */
-static int
-bpf_jmp_to_sljit_cond(struct bpf_insn *pc)
-{
-
-	switch (BPF_OP(pc->code)) {
 	case BPF_NEG: return SLJIT_NOT;
-	case BPF_JEQ: return SLJIT_C_EQUAL;
-	case BPF_JGT: return SLJIT_C_GREATER;
-	case BPF_JGE: return SLJIT_C_GREATER_EQUAL;
 	default:
 		assert(false);
 	}
@@ -275,16 +257,16 @@ bpf_jmp_to_sljit_cond(struct bpf_insn *pc)
 #endif
 
 /*
- * Convert BPF_JMP operations except BPF_JA and BPF_JSET.
+ * Convert BPF_JMP operations except BPF_JA and BPF_JSET to sljit condition.
  */
 static int
-bpf_jmp_to_sljit_cond_inverted(struct bpf_insn *pc)
+bpf_jmp_to_sljit_cond(struct bpf_insn *pc, bool negate)
 {
 
 	switch (BPF_OP(pc->code)) {
-	case BPF_JGT: return SLJIT_C_LESS_EQUAL;
-	case BPF_JGE: return SLJIT_C_LESS;
-	case BPF_JEQ: return SLJIT_C_NOT_EQUAL;
+	case BPF_JGT: return negate ? SLJIT_C_LESS_EQUAL : SLJIT_C_GREATER;
+	case BPF_JGE: return negate ? SLJIT_C_LESS : SLJIT_C_GREATER_EQUAL;
+	case BPF_JEQ: return negate ? SLJIT_C_NOT_EQUAL : SLJIT_C_EQUAL;
 	default:
 		assert(false);
 	}
@@ -322,6 +304,30 @@ skip_X_init(struct bpf_insn *insns, size_t insn_count)
 	return false;
 }
 
+static int
+jump_reg(struct bpf_insn *pc)
+{
+
+	switch (BPF_SRC(pc->code)) {
+	case BPF_K: return SLJIT_IMM;
+	case BPF_X: return BPFJIT_X;
+	default:
+		assert(false);
+	}
+}
+
+static sljit_w
+jump_reg_width(struct bpf_insn *pc)
+{
+
+	switch (BPF_SRC(pc->code)) {
+	case BPF_K: return pc->k; /* SLJIT_IMM, pc->k, */
+	case BPF_X: return 0;     /* BPFJIT_X, 0,      */
+	default:
+		assert(false);
+	}
+}
+
 void *
 bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 {
@@ -348,6 +354,9 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	struct sljit_label *label;
 	struct sljit_jump *jump;
 	struct bpfjit_jump *bjump;
+
+	/* used for BPF_JA and for the second jump when jt != 0 && jf != 0 */
+	uint32_t ja;
 
 	rv = NULL;
 	compiler = NULL;
@@ -600,22 +609,61 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			continue;
 
 		case BPF_JMP:
-			if (BPF_SRC(pc->code) == BPF_K) {
+			ja = UINT32_MAX;
+			if (BPF_OP(pc->code) == BPF_JA)
+				ja = pc->k;
+			else if (pc->jt != 0 && pc->jf != 0)
+				ja = pc->jf;
+
+			/* XXX check the case jt == 0 && jf == 0 */
+
+			if (BPF_OP(pc->code) != BPF_JA) {
+				bool negate;
+				unsigned int jm;
+
 				bjump = malloc(sizeof(struct bpfjit_jump));
 				if (bjump == NULL)
 					goto fail;
 
-				if (pc->jt == 0) {
-					bjump->bj_jump = sljit_emit_cmp(
-					    compiler,
-					    bpf_jmp_to_sljit_cond_inverted(pc),
-					    SLJIT_IMM, pc->k,
-					    BPFJIT_A, 0);
-					SLIST_INSERT_HEAD(&jumps[i + 1 + pc->jf],
-					    bjump, bj_entries);
-					if (bjump->bj_jump == NULL)
-						goto fail;
-				}
+				negate = (pc->jt == 0);
+				jm = negate ? pc->jf : pc->jt;
+				if (jm >= insn_count - (i + 1))
+					goto fail;
+
+				/*
+				 * XXX implement BPF_JSET
+				 * BPF_JMP+BPF_JSET+BPF_K   pc += (A & k) ? jt : jf
+				 * BPF_JMP+BPF_JSET+BPF_X   pc += (A & X) ? jt : jf
+				 */
+
+				bjump->bj_jump = sljit_emit_cmp(compiler,
+				    bpf_jmp_to_sljit_cond(pc, negate),
+				    jump_reg(pc), jump_reg_width(pc),
+				    BPFJIT_A, 0);
+
+				SLIST_INSERT_HEAD(&jumps[jm + (i + 1)],
+				    bjump, bj_entries);
+
+				if (bjump->bj_jump == NULL)
+					goto fail;
+			}
+
+			if (ja != UINT32_MAX) {
+				if (ja >= insn_count - (i + 1))
+					goto fail;
+
+				bjump = malloc(sizeof(struct bpfjit_jump));
+				if (bjump == NULL)
+					goto fail;
+
+				bjump->bj_jump = sljit_emit_jump(compiler,
+				    SLJIT_JUMP);
+
+				SLIST_INSERT_HEAD(&jumps[ja + (i + 1)],
+				    bjump, bj_entries);
+
+				if (bjump->bj_jump == NULL)
+					goto fail;
 			}
 
 			continue;
