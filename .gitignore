@@ -1,0 +1,3 @@
+sljit/**/*.h
+sljit/**/*.c
+sljit/README
