@@ -233,12 +233,11 @@ count_ret_insns(struct bpf_insn *insns, size_t insn_count)
 	return rv;
 }
 
-#if 0
 /*
- * Convert BPF_ALU operations except BPF_DIV.
+ * Convert BPF_ALU operations except BPF_DIV to sljit operation.
  */
 static int
-bpf_alu_to_sljit(struct bpf_insn *pc)
+bpf_alu_to_sljit_op(struct bpf_insn *pc)
 {
 
 	switch (BPF_OP(pc->code)) {
@@ -254,7 +253,6 @@ bpf_alu_to_sljit(struct bpf_insn *pc)
 		assert(false);
 	}
 }
-#endif
 
 /*
  * Convert BPF_JMP operations except BPF_JA and BPF_JSET to sljit condition.
@@ -304,8 +302,11 @@ skip_X_init(struct bpf_insn *insns, size_t insn_count)
 	return false;
 }
 
+/*
+ * Convert BPF_K and BPF_X to sljit register.
+ */
 static int
-jump_reg(struct bpf_insn *pc)
+kx_to_reg(struct bpf_insn *pc)
 {
 
 	switch (BPF_SRC(pc->code)) {
@@ -317,7 +318,7 @@ jump_reg(struct bpf_insn *pc)
 }
 
 static sljit_w
-jump_reg_width(struct bpf_insn *pc)
+kx_to_reg_arg(struct bpf_insn *pc)
 {
 
 	switch (BPF_SRC(pc->code)) {
@@ -613,6 +614,33 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			 */
 			goto fail;
 
+		case BPF_ALU:
+
+			if (pc->code == (BPF_ALU|BPF_NEG)) {
+				status = sljit_emit_op1(compiler,
+				    SLJIT_NEG,
+				    BPFJIT_A, 0,
+				    BPFJIT_A, 0);
+				if (status != SLJIT_SUCCESS)
+					goto fail;
+				continue;
+			}
+
+			if (BPF_OP(pc->code) == BPF_DIV) {
+				/* XXX implement */
+				goto fail;
+			}
+
+			status = sljit_emit_op2(compiler,
+			    bpf_alu_to_sljit_op(pc),
+			    BPFJIT_A, 0,
+			    BPFJIT_A, 0,
+			    kx_to_reg(pc), kx_to_reg_arg(pc));
+			if (status != SLJIT_SUCCESS)
+				goto fail;
+
+			continue;
+
 		case BPF_JMP:
 			ja = UINT32_MAX;
 			if (BPF_OP(pc->code) == BPF_JA) {
@@ -646,7 +674,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 
 				bjump->bj_jump = sljit_emit_cmp(compiler,
 				    bpf_jmp_to_sljit_cond(pc, negate),
-				    jump_reg(pc), jump_reg_width(pc),
+				    kx_to_reg(pc), kx_to_reg_arg(pc),
 				    BPFJIT_A, 0);
 
 				SLIST_INSERT_HEAD(&jumps[jm + (i + 1)],
