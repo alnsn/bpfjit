@@ -64,7 +64,7 @@ test_ldx_len(void)
 		BPF_STMT(BPF_LDX+BPF_W+BPF_LEN, 0),
 		BPF_STMT(BPF_LD+BPF_IMM, 5),
 		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_X, 0, 1, 0),
-		BPF_STMT(BPF_RET+BPF_K, 0),
+		BPF_STMT(BPF_RET+BPF_K, 7),
 		BPF_STMT(BPF_RET+BPF_K, UINT32_MAX)
 	};
 
@@ -79,7 +79,7 @@ test_ldx_len(void)
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_execute_code(pkt, 5, 1, code) == UINT32_MAX);
-	CHECK(bpfjit_execute_code(pkt, 6, 5, code) == 0);
+	CHECK(bpfjit_execute_code(pkt, 6, 5, code) == 7);
 
 	bpfjit_free_code(code);
 }
