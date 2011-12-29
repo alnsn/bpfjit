@@ -613,48 +613,6 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			 */
 			goto fail;
 
-		case BPF_RET:
-			rval = BPF_RVAL(pc->code);
-			if (rval == BPF_X)
-				goto fail;
-
-			/* BPF_RET+BPF_K    accept k bytes */
-			if (rval == BPF_K) {
-				status = sljit_emit_op1(compiler,
-				    SLJIT_MOV,
-				    BPFJIT_A, 0,
-				    SLJIT_IMM, pc->k);
-				if (status != SLJIT_SUCCESS)
-					goto fail;
-			}
-
-			/* BPF_RET+BPF_A    accept A bytes */
-			if (rval == BPF_A) {
-#if BPFJIT_A != SLJIT_RETURN_REG
-				status = sljit_emit_op1(compiler,
-				    SLJIT_MOV,
-				    SLJIT_RETURN_REG, 0,
-				    BPFJIT_A, 0);
-				if (status != SLJIT_SUCCESS)
-					goto fail;
-#endif
-			}
-
-			/*
-			 * Save a jump to a normal return. If the program
-			 * ends with BPF_RET, no jump is needed because
-			 * the normal return is generated right after the
-			 * last instruction.
-			 */
-			if (i != insn_count - 1) {
-				jump = sljit_emit_jump(compiler, SLJIT_JUMP);
-				if (jump == NULL)
-					goto fail;
-				returns[returns_size++] = jump;
-			}
-
-			continue;
-
 		case BPF_JMP:
 			ja = UINT32_MAX;
 			if (BPF_OP(pc->code) == BPF_JA) {
@@ -714,6 +672,48 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 
 				if (bjump->bj_jump == NULL)
 					goto fail;
+			}
+
+			continue;
+
+		case BPF_RET:
+			rval = BPF_RVAL(pc->code);
+			if (rval == BPF_X)
+				goto fail;
+
+			/* BPF_RET+BPF_K    accept k bytes */
+			if (rval == BPF_K) {
+				status = sljit_emit_op1(compiler,
+				    SLJIT_MOV,
+				    BPFJIT_A, 0,
+				    SLJIT_IMM, pc->k);
+				if (status != SLJIT_SUCCESS)
+					goto fail;
+			}
+
+			/* BPF_RET+BPF_A    accept A bytes */
+			if (rval == BPF_A) {
+#if BPFJIT_A != SLJIT_RETURN_REG
+				status = sljit_emit_op1(compiler,
+				    SLJIT_MOV,
+				    SLJIT_RETURN_REG, 0,
+				    BPFJIT_A, 0);
+				if (status != SLJIT_SUCCESS)
+					goto fail;
+#endif
+			}
+
+			/*
+			 * Save a jump to a normal return. If the program
+			 * ends with BPF_RET, no jump is needed because
+			 * the normal return is generated right after the
+			 * last instruction.
+			 */
+			if (i != insn_count - 1) {
+				jump = sljit_emit_jump(compiler, SLJIT_JUMP);
+				if (jump == NULL)
+					goto fail;
+				returns[returns_size++] = jump;
 			}
 
 			continue;
