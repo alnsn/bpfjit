@@ -241,14 +241,14 @@ bpf_alu_to_sljit_op(struct bpf_insn *pc)
 {
 
 	switch (BPF_OP(pc->code)) {
-	case BPF_ADD: return SLJIT_ADD;
-	case BPF_SUB: return SLJIT_SUB;
-	case BPF_MUL: return SLJIT_MUL;
-	case BPF_OR:  return SLJIT_OR;
-	case BPF_AND: return SLJIT_AND;
-	case BPF_LSH: return SLJIT_SHL;
-	case BPF_RSH: return SLJIT_LSHR; /* XXX or SLJIT_ASHR? */
-	case BPF_NEG: return SLJIT_NOT;
+	case BPF_ADD: return SLJIT_INT_OP|SLJIT_ADD;
+	case BPF_SUB: return SLJIT_INT_OP|SLJIT_SUB;
+	case BPF_MUL: return SLJIT_INT_OP|SLJIT_MUL;
+	case BPF_OR:  return SLJIT_INT_OP|SLJIT_OR;
+	case BPF_AND: return SLJIT_INT_OP|SLJIT_AND;
+	case BPF_LSH: return SLJIT_INT_OP|SLJIT_SHL;
+	case BPF_RSH: return SLJIT_INT_OP|SLJIT_LSHR; /* XXX or SLJIT_ASHR? */
+	case BPF_NEG: return SLJIT_INT_OP|SLJIT_NOT;
 	default:
 		assert(false);
 	}
