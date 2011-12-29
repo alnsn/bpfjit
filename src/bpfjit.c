@@ -451,13 +451,53 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			goto fail;
 
 		case BPF_LD:
-			mode = BPF_MODE(pc->code);
-			width = read_width(pc);
-			if (width == -1)
+			/* BPF_LD+BPF_IMM          A <- k */
+			if (pc->code == (BPF_LD|BPF_IMM)) {
+				status = sljit_emit_op1(compiler,
+				    SLJIT_MOV,
+				    BPFJIT_A, 0,
+				    SLJIT_IMM, pc->k);
+				if (status != SLJIT_SUCCESS)
+					goto fail;
+				continue;
+			}
+
+			/* BPF_LD+BPF_MEM          A <- M[k] */
+			if (pc->code == (BPF_LD|BPF_MEM)) {
+				/* XXX implement */
 				goto fail;
+			}
+
+			mode = BPF_MODE(pc->code);
+
+			/* BPF_LD+BPF_W+BPF_LEN    A <- len */
+			if (mode == BPF_LEN) {
+				if (BPF_SIZE(pc->code) != BPF_W)
+					goto fail;
+				status = sljit_emit_op1(compiler,
+				    SLJIT_MOV,
+				    BPFJIT_A, 0,
+				    BPFJIT_WIRELEN, 0);
+				if (status != SLJIT_SUCCESS)
+					goto fail;
+				continue;
+			}
+
+			if (mode != BPF_ABS && mode != BPF_IND)
+				goto fail;
+
+			/*
+			 * BPF_LD+BPF_W+BPF_ABS    A <- P[k:4]
+			 * BPF_LD+BPF_H+BPF_ABS    A <- P[k:2]
+			 * BPF_LD+BPF_B+BPF_ABS    A <- P[k:1]
+			 * BPF_LD+BPF_W+BPF_IND    A <- P[X+k:4]
+			 * BPF_LD+BPF_H+BPF_IND    A <- P[X+k:2]
+			 * BPF_LD+BPF_B+BPF_IND    A <- P[X+k:1]
+			 */
 
 			if (mode == BPF_IND) {
 				/* if (X > buflen) return 0; */
+				/* XXX this doesn't seem to be right */
 				jump = sljit_emit_cmp(compiler,
 				    SLJIT_C_GREATER,
 				    BPFJIT_X, 0,
@@ -484,35 +524,37 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 					goto fail;
 			}
 
+			width = read_width(pc);
+			if (width == -1)
+				goto fail;
+
+			/* overflow check for pc->k + width */
+			if (pc->k > UINT32_MAX - width)
+				goto fail;
+
 			/* if (pc->k + width > buflen) return 0; */
-			if (mode == BPF_ABS || mode == BPF_IND) {
-				/* overflow check for pc->k + width */
-				if (pc->k > UINT32_MAX - width)
-					goto fail;
-				jump = sljit_emit_cmp(compiler,
-				    SLJIT_C_GREATER,
-				    SLJIT_IMM, pc->k + (uint32_t)width,
-				    BPFJIT_BUFLEN, 0);
-				if (jump == NULL)
-					goto fail;
-				oob[oob_size++] = jump;
+			jump = sljit_emit_cmp(compiler,
+			    SLJIT_C_GREATER,
+			    SLJIT_IMM, pc->k + (uint32_t)width,
+			    BPFJIT_BUFLEN, 0);
+			if (jump == NULL)
+				goto fail;
+			oob[oob_size++] = jump;
+
+			switch (width) {
+			case 4:
+				status = emit_ld_w_abs(compiler, pc);
+				break;
+			case 2:
+				status = emit_ld_h_abs(compiler, pc);
+				break;
+			case 1:
+				status = emit_ld_b_abs(compiler, pc);
+				break;
 			}
 
-			if (mode == BPF_ABS || mode == BPF_IND) {
-				switch (width) {
-				case 4:
-					status = emit_ld_w_abs(compiler, pc);
-					break;
-				case 2:
-					status = emit_ld_h_abs(compiler, pc);
-					break;
-				case 1:
-					status = emit_ld_b_abs(compiler, pc);
-					break;
-				}
-				if (status != SLJIT_SUCCESS)
-					goto fail;
-			}
+			if (status != SLJIT_SUCCESS)
+				goto fail;
 
 			/* restore buf and buflen values: buf -= X; buflen += X; */
 			if (mode == BPF_IND) {
@@ -532,13 +574,6 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				if (status != SLJIT_SUCCESS)
 					goto fail;
 			}
-
-			/*
-			 * XXX implement
-			 * BPF_LD+BPF_W+BPF_LEN    A <- len
-			 * BPF_LD+BPF_IMM          A <- k
-			 * BPF_LD+BPF_MEM          A <- M[k]
-			 */
 
 			continue;
 
