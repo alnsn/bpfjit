@@ -1,5 +1,5 @@
 PROG=	bpfjit_test
-SRCS=	main.c util.c test_empty.c test_ld.c
+SRCS=	main.c util.c test_empty.c test_ld.c test_ldx.c
 
 COPTS+=		-O2 -g
 CPPFLAGS+=	-I ../src

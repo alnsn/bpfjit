@@ -27,14 +27,65 @@
  * SUCH DAMAGE.
  */
 
-#include "tests.h"
+#include <bpfjit.h>
+
 #include "util.h"
 
-int main()
+static void
+test_ldx_imm(void)
 {
-	test_empty();
-	test_ld();
-	test_ldx();
+	static struct bpf_insn insns[] = {
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 5),
+		BPF_STMT(BPF_LD+BPF_IMM, 5),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_X, 0, 1, 0),
+		BPF_STMT(BPF_RET+BPF_K, 0),
+		BPF_STMT(BPF_RET+BPF_K, UINT32_MAX)
+	};
 
-	return exit_status;
+	void *code;
+	uint8_t pkt[1]; /* the program doesn't read any data */
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	REQUIRE(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_MAX);
+
+	bpfjit_free_code(code);
+}
+
+static void
+test_ldx_len(void)
+{
+	static struct bpf_insn insns[] = {
+		BPF_STMT(BPF_LDX+BPF_W+BPF_LEN, 0),
+		BPF_STMT(BPF_LD+BPF_IMM, 5),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_X, 0, 1, 0),
+		BPF_STMT(BPF_RET+BPF_K, 0),
+		BPF_STMT(BPF_RET+BPF_K, UINT32_MAX)
+	};
+
+	void *code;
+	uint8_t pkt[5]; /* the program doesn't read any data */
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	REQUIRE(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	CHECK(bpfjit_execute_code(pkt, 5, 1, code) == UINT32_MAX);
+	CHECK(bpfjit_execute_code(pkt, 6, 5, code) == 0);
+
+	bpfjit_free_code(code);
+}
+
+void test_ldx(void)
+{
+	test_ldx_imm();
+	test_ldx_len();
 }
