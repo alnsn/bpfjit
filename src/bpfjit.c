@@ -207,7 +207,7 @@ count_oob_jumps(struct bpf_insn *insns, size_t insn_count)
 			}
 			break;
 		case BPF_LDX:
-			if (pc->code & BPF_MSH)
+			if (pc->code == (BPF_LDX|BPF_B|BPF_MSH))
 				rv++;
 			break;
 		}
@@ -590,16 +590,28 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				    SLJIT_IMM, pc->k);
 				if (status != SLJIT_SUCCESS)
 					goto fail;
+				continue;
+			}
+
+			/* BPF_LDX+BPF_W+BPF_LEN    X <- len */
+			if (mode == BPF_LEN) {
+				if (BPF_SIZE(pc->code) != BPF_W)
+					goto fail;
+				status = sljit_emit_op1(compiler,
+				    SLJIT_MOV,
+				    BPFJIT_X, 0,
+				    BPFJIT_WIRELEN, 0);
+				if (status != SLJIT_SUCCESS)
+					goto fail;
+				continue;
 			}
 
 			/*
 			 * XXX implement
 			 * BPF_LDX+BPF_W+BPF_MEM    X <- M[k]
-			 * BPF_LDX+BPF_W+BPF_LEN    X <- len
 			 * BPF_LDX+BPF_B+BPF_MSH    X <- 4*(P[k:1]&0xf)
 			 */
-
-			continue;
+			goto fail;
 
 		case BPF_RET:
 			rval = BPF_RVAL(pc->code);
@@ -645,10 +657,13 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 
 		case BPF_JMP:
 			ja = UINT32_MAX;
-			if (BPF_OP(pc->code) == BPF_JA)
+			if (BPF_OP(pc->code) == BPF_JA) {
+				if (pc->k == ja)
+					goto fail;
 				ja = pc->k;
-			else if (pc->jt != 0 && pc->jf != 0)
+			} else if (pc->jt != 0 && pc->jf != 0) {
 				ja = pc->jf;
+			}
 
 			/* XXX check the case jt == 0 && jf == 0 */
 
