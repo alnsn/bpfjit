@@ -30,6 +30,7 @@
 #include <bpfjit.h>
 
 #include "util.h"
+#include "tests.h"
 
 
 void test_empty(void)

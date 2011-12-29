@@ -30,9 +30,34 @@
 #include <bpfjit.h>
 
 #include "util.h"
+#include "tests.h"
 
 static void
-test_ldx_imm(void)
+test_ldx_imm1(void)
+{
+	static struct bpf_insn insns[] = {
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, UINT32_MAX - 5),
+		BPF_STMT(BPF_ALU+BPF_ADD+BPF_X, 0),
+		BPF_STMT(BPF_RET+BPF_A, 0)
+	};
+
+	void *code;
+	uint8_t pkt[1]; /* the program doesn't read any data */
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	REQUIRE(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_MAX - 5);
+
+	bpfjit_free_code(code);
+}
+
+static void
+test_ldx_imm2(void)
 {
 	static struct bpf_insn insns[] = {
 		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 5),
@@ -58,7 +83,35 @@ test_ldx_imm(void)
 }
 
 static void
-test_ldx_len(void)
+test_ldx_len1(void)
+{
+	static struct bpf_insn insns[] = {
+		BPF_STMT(BPF_LDX+BPF_W+BPF_LEN, 0),
+		BPF_STMT(BPF_ALU+BPF_ADD+BPF_X, 0),
+		BPF_STMT(BPF_RET+BPF_A, 0)
+	};
+
+	size_t i;
+	void *code;
+	uint8_t pkt[5]; /* the program doesn't read any data */
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	REQUIRE(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	for (i = 1; i < sizeof(pkt); i++) {
+		CHECK(bpfjit_execute_code(pkt, i, 1, code) == i);
+		CHECK(bpfjit_execute_code(pkt, i + 1, i, code) == i + 1);
+	}
+
+	bpfjit_free_code(code);
+}
+
+static void
+test_ldx_len2(void)
 {
 	static struct bpf_insn insns[] = {
 		BPF_STMT(BPF_LDX+BPF_W+BPF_LEN, 0),
@@ -86,6 +139,8 @@ test_ldx_len(void)
 
 void test_ldx(void)
 {
-	test_ldx_imm();
-	test_ldx_len();
+	test_ldx_imm1();
+	test_ldx_imm2();
+	test_ldx_len1();
+	test_ldx_len2();
 }

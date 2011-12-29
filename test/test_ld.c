@@ -30,6 +30,7 @@
 #include <bpfjit.h>
 
 #include "util.h"
+#include "tests.h"
 
 static uint8_t deadbeef_at_5[16] = {
 	0, 0xf1, 2, 0xf3, 4, 0xde, 0xad, 0xbe, 0xef, 0xff

@@ -1,6 +1,8 @@
 PROG=	bpfjit_test
 SRCS=	main.c util.c test_empty.c test_ld.c test_ldx.c
 
+WARNS=	4
+
 COPTS+=		-O2 -g
 CPPFLAGS+=	-I ../src
 CPPFLAGS+=	-DSLJIT_CONFIG_AUTO=1

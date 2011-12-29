@@ -30,7 +30,7 @@
 #include "tests.h"
 #include "util.h"
 
-int main()
+int main(void)
 {
 	test_empty();
 	test_ld();
