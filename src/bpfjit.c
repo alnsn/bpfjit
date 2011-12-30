@@ -30,11 +30,37 @@
 #include "bpfjit.h"
 
 #include <assert.h>
-#include <inttypes.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <sys/queue.h>
 #include <sys/types.h>
+
+#include <sljitLir.h>
+
+
+#define BPFJIT_A	SLJIT_TEMPORARY_REG1
+#define BPFJIT_X	SLJIT_TEMPORARY_EREG1
+#define BPFJIT_TMP1	SLJIT_TEMPORARY_REG2
+#define BPFJIT_TMP2	SLJIT_TEMPORARY_REG3
+#define BPFJIT_BUF	SLJIT_GENERAL_REG1
+#define BPFJIT_WIRELEN	SLJIT_GENERAL_REG2
+#define BPFJIT_BUFLEN	SLJIT_GENERAL_REG3
+
+/* 
+ * Flags for bpfjit_optimization_hints().
+ */
+#define BPFJIT_INIT_X 0x10000
+#define BPFJIT_INIT_A 0x20000
+
+
+struct bpfjit_jump
+{
+	struct sljit_jump *bj_jump;
+	SLIST_ENTRY(bpfjit_jump) bj_entries;
+};
+
 
 #if defined(SLJIT_VERBOSE) && SLJIT_VERBOSE
 #include <stdio.h> /* for stderr */
@@ -285,20 +311,81 @@ read_width(struct bpf_insn *pc)
 	}
 }
 
-static bool
-skip_A_init(struct bpf_insn *insns, size_t insn_count)
+static unsigned int
+bpfjit_optimization_hints(struct bpf_insn *insns, size_t insn_count)
 {
+	unsigned int rv = BPFJIT_INIT_A;
+	struct bpf_insn *pc;
+	unsigned int minm, maxm;
 
-	/* XXX implement */
-	return false;
-}
+	assert(BPF_MEMWORDS - 1 <= 0xff);
 
-static bool
-skip_X_init(struct bpf_insn *insns, size_t insn_count)
-{
+	maxm = 0;
+	minm = BPF_MEMWORDS - 1;
 
-	/* XXX implement */
-	return false;
+	for (pc = insns; pc != insns + insn_count; pc++) {
+		switch (BPF_CLASS(pc->code)) {
+		case BPF_LD:
+			if (BPF_MODE(pc->code) == BPF_IND)
+				rv |= BPFJIT_INIT_X;
+			if (BPF_MODE(pc->code) == BPF_MEM &&
+			    pc->k < BPF_MEMWORDS) {
+				if (pc->k > maxm)
+					maxm = pc->k;
+				if (pc->k < minm)
+					minm = pc->k;
+			}
+			continue;
+		case BPF_LDX:
+			rv |= BPFJIT_INIT_X;
+			if (BPF_MODE(pc->code) == BPF_MEM &&
+			    pc->k < BPF_MEMWORDS) {
+				if (pc->k > maxm)
+					maxm = pc->k;
+				if (pc->k < minm)
+					minm = pc->k;
+			}
+			continue;
+		case BPF_ST:
+			if (pc->k < BPF_MEMWORDS) {
+				if (pc->k > maxm)
+					maxm = pc->k;
+				if (pc->k < minm)
+					minm = pc->k;
+			}
+			continue;
+		case BPF_STX:
+			rv |= BPFJIT_INIT_X;
+			if (pc->k < BPF_MEMWORDS) {
+				if (pc->k > maxm)
+					maxm = pc->k;
+				if (pc->k < minm)
+					minm = pc->k;
+			}
+			continue;
+		case BPF_ALU:
+			if (pc->code == (BPF_ALU|BPF_NEG))
+				continue;
+			if (BPF_SRC(pc->code) == BPF_X)
+				rv |= BPFJIT_INIT_X;
+			continue;
+		case BPF_JMP:
+			if (pc->code == (BPF_JMP|BPF_JA))
+				continue;
+			if (BPF_SRC(pc->code) == BPF_X)
+				rv |= BPFJIT_INIT_X;
+			continue;
+		case BPF_RET:
+			continue;
+		case BPF_MISC:
+			rv |= BPFJIT_INIT_X;
+			continue;
+		default:
+			assert(false);
+		}
+	}
+
+	return rv | (maxm << 8) | minm;
 }
 
 /*
@@ -337,6 +424,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	int width;
 	unsigned int rval, mode;
 	int num_used_memwords;
+	unsigned int opts;
 	struct sljit_compiler* compiler;
 
 	/* jumps[pc-insns] stores a list of jumps to instruction pc */
@@ -363,6 +451,8 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	jumps = NULL;
 	returns = NULL;
 	oob = NULL;
+
+	opts = bpfjit_optimization_hints(insns, insn_count);
 
 	num_used_memwords = 0; /* XXX implement */
 
@@ -403,7 +493,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	if (status != SLJIT_SUCCESS)
 		goto fail;
 
-	if (!skip_A_init(insns, insn_count)) {
+	if (opts & BPFJIT_INIT_A) {
 		/* A = 0; */
 		status = sljit_emit_op1(compiler,
 		    SLJIT_MOV,
@@ -413,7 +503,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			goto fail;
 	}
 
-	if (!skip_X_init(insns, insn_count)) {
+	if (opts & BPFJIT_INIT_X) {
 		/* X = 0; */
 		status = sljit_emit_op1(compiler,
 		    SLJIT_MOV,

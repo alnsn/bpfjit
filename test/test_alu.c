@@ -30,6 +30,8 @@
 
 #include <bpfjit.h>
 
+#include <stdint.h>
+
 #include "util.h"
 #include "tests.h"
 

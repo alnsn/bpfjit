@@ -30,6 +30,7 @@
 #include <bpfjit.h>
 
 #include <limits.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -66,21 +67,6 @@ static uint8_t pkt[128] = {
 	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0x08, 0x00
 };
 
-/* XXX switch to bpfjit_execute_code */
-static inline unsigned int
-execute_code(const uint8_t *p, unsigned int wirelen,
-    unsigned int buflen, const void *code)
-{
-	union
-	{
-		const void* code;
-		sljit_uw (SLJIT_CALL *func)(const uint8_t *p,
-		    sljit_uw wirelen, sljit_uw buflen);
-	} func = { code };
-
-	return func.func(p, wirelen, buflen);
-}
-
 void
 test_bpfjit(size_t counter, size_t dummy)
 {
@@ -91,8 +77,7 @@ test_bpfjit(size_t counter, size_t dummy)
 	code = bpfjit_generate_code(insns, sizeof(insns) / sizeof(insns[0]));
 
 	for (i = 0; i < counter; i++)
-		//ret += bpfjit_execute_code(pkt, 32, 16, code);
-		ret += execute_code(pkt, sizeof(pkt), sizeof(pkt), code);
+		ret += bpfjit_execute_code(pkt, 32, 16, code);
 
 	bpfjit_free_code(code);
 
