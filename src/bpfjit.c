@@ -95,10 +95,10 @@ emit_read16(struct sljit_compiler* compiler, uint32_t k)
 	if (status != SLJIT_SUCCESS)
 		return status;
 
-	/* tmp2 = buf[k+1]; */
+	/* A = buf[k+1]; */
 	status = sljit_emit_op1(compiler,
 	    SLJIT_MOV_UB,
-	    BPFJIT_TMP2, 0,
+	    BPFJIT_A, 0,
 	    SLJIT_MEM1(BPFJIT_BUF), k+1);
 	if (status != SLJIT_SUCCESS)
 		return status;
@@ -112,12 +112,12 @@ emit_read16(struct sljit_compiler* compiler, uint32_t k)
 	if (status != SLJIT_SUCCESS)
 		return status;
 
-	/* A = tmp1 + tmp2; */
+	/* A = A + tmp1; */
 	status = sljit_emit_op2(compiler,
 	    SLJIT_ADD,
 	    BPFJIT_A, 0,
-	    BPFJIT_TMP1, 0,
-	    BPFJIT_TMP2, 0);
+	    BPFJIT_A, 0,
+	    BPFJIT_TMP1, 0);
 	return status;
 }
 
