@@ -37,6 +37,10 @@
 #include <sys/queue.h>
 #include <sys/types.h>
 
+#if defined(SLJIT_VERBOSE) && SLJIT_VERBOSE
+#include <stdio.h> /* for stderr */
+#endif
+
 #include <sljitLir.h>
 
 
@@ -61,10 +65,6 @@ struct bpfjit_jump
 	SLIST_ENTRY(bpfjit_jump) bj_entries;
 };
 
-
-#if defined(SLJIT_VERBOSE) && SLJIT_VERBOSE
-#include <stdio.h> /* for stderr */
-#endif
 
 /*
  * Generate code for BPF_LD+BPF_B+BPF_ABS    A <- P[k:1].
@@ -716,8 +716,9 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			}
 
 			if (BPF_OP(pc->code) == BPF_DIV) {
-				/* XXX implement */
-				goto fail;
+				if (pc->k == 0)
+					goto fail;
+				continue;
 			}
 
 			status = sljit_emit_op2(compiler,
