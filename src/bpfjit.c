@@ -762,18 +762,18 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			continue;
 
 		case BPF_JMP:
+
 			ja = UINT32_MAX;
 			if (BPF_OP(pc->code) == BPF_JA) {
 				if (pc->k == ja)
 					goto fail;
 				ja = pc->k;
-			} else if (pc->jt != 0 && pc->jf != 0) {
+			} else if (pc->jt == pc->jf ||
+			    (pc->jt != 0 && pc->jf != 0)) {
 				ja = pc->jf;
 			}
 
-			/* XXX check the case jt == 0 && jf == 0 */
-
-			if (BPF_OP(pc->code) != BPF_JA) {
+			if (BPF_OP(pc->code) != BPF_JA && pc->jt != pc->jf) {
 				bool negate;
 				unsigned int jm;
 
@@ -825,6 +825,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			continue;
 
 		case BPF_RET:
+
 			rval = BPF_RVAL(pc->code);
 			if (rval == BPF_X)
 				goto fail;
@@ -865,6 +866,30 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			}
 
 			continue;
+
+		case BPF_MISC:
+
+			if (pc->k == (BPF_MISC|BPF_TAX)) {
+				status = sljit_emit_op1(compiler,
+				    SLJIT_MOV,
+				    BPFJIT_X, 0,
+				    BPFJIT_A, 0);
+				if (status != SLJIT_SUCCESS)
+					goto fail;
+				continue;
+			}
+
+			if (pc->k == (BPF_MISC|BPF_TXA)) {
+				status = sljit_emit_op1(compiler,
+				    SLJIT_MOV,
+				    BPFJIT_A, 0,
+				    BPFJIT_X, 0);
+				if (status != SLJIT_SUCCESS)
+					goto fail;
+				continue;
+			}
+
+			goto fail;
 		} /* switch */
 	} /* main loop */
 
