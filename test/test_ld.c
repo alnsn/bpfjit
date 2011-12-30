@@ -191,7 +191,8 @@ test_ld_imm(void)
 	bpfjit_free_code(code);
 }
 
-void test_ld(void)
+void
+test_ld(void)
 {
 	test_ld_abs();
 	test_ld_ind();

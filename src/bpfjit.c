@@ -869,7 +869,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 
 		case BPF_MISC:
 
-			if (pc->k == (BPF_MISC|BPF_TAX)) {
+			if (pc->code == (BPF_MISC|BPF_TAX)) {
 				status = sljit_emit_op1(compiler,
 				    SLJIT_MOV,
 				    BPFJIT_X, 0,
@@ -879,7 +879,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				continue;
 			}
 
-			if (pc->k == (BPF_MISC|BPF_TXA)) {
+			if (pc->code == (BPF_MISC|BPF_TXA)) {
 				status = sljit_emit_op1(compiler,
 				    SLJIT_MOV,
 				    BPFJIT_A, 0,

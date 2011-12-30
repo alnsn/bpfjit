@@ -33,7 +33,8 @@
 #include "tests.h"
 
 
-void test_empty(void)
+void
+test_empty(void)
 {
 	struct bpf_insn dummy;
 

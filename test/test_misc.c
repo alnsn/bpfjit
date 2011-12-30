@@ -27,15 +27,65 @@
  * SUCH DAMAGE.
  */
 
-#include "tests.h"
+#include <bpfjit.h>
+
+#include <stdint.h>
+
 #include "util.h"
+#include "tests.h"
 
-int main(void)
+static void
+test_misc_tax(void)
 {
-	test_empty();
-	test_ld();
-	test_ldx();
-	test_misc();
+	static struct bpf_insn insns[] = {
+		BPF_STMT(BPF_LD+BPF_IMM, 3),
+		BPF_STMT(BPF_MISC+BPF_TAX, 0),
+		BPF_STMT(BPF_LD+BPF_B+BPF_IND, 2),
+		BPF_STMT(BPF_RET+BPF_A, 0)
+	};
 
-	return exit_status;
+	void *code;
+	uint8_t pkt[] = { 0, 11, 22, 33, 44, 55 };
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	REQUIRE(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	CHECK(bpfjit_execute_code(pkt, sizeof(pkt), sizeof(pkt), code) == 55);
+
+	bpfjit_free_code(code);
+}
+
+static void
+test_misc_txa(void)
+{
+	static struct bpf_insn insns[] = {
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 391),
+		BPF_STMT(BPF_MISC+BPF_TXA, 0),
+		BPF_STMT(BPF_RET+BPF_A, 0)
+	};
+
+	void *code;
+	uint8_t pkt[1]; /* the program doesn't read any data */
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	REQUIRE(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 391);
+
+	bpfjit_free_code(code);
+}
+
+void
+test_misc(void)
+{
+	test_misc_tax();
+	test_misc_txa();
 }
