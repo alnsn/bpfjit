@@ -267,7 +267,32 @@ test_alu_or_k(void)
 	bpfjit_free_code(code);
 }
 
-void test_alu(void)
+static void
+test_alu_neg(void)
+{
+	static struct bpf_insn insns[] = {
+		BPF_STMT(BPF_LD+BPF_IMM, 777),
+		BPF_STMT(BPF_ALU+BPF_NEG, 0),
+		BPF_STMT(BPF_RET+BPF_A, 0)
+	};
+
+	void *code;
+	uint8_t pkt[1]; /* the program doesn't read any data */
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	REQUIRE(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0u-777u);
+
+	bpfjit_free_code(code);
+}
+
+void
+test_alu(void)
 {
 	test_alu_add_k();
 	test_alu_sub_k();
@@ -279,4 +304,5 @@ void test_alu(void)
 	test_alu_div2147483648_k();
 	test_alu_and_k();
 	test_alu_or_k();
+	test_alu_neg();
 }
