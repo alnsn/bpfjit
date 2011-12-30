@@ -70,36 +70,36 @@ struct bpfjit_jump
  * Generate code for BPF_LD+BPF_B+BPF_ABS    A <- P[k:1].
  */
 static int
-emit_ld_b_abs(struct sljit_compiler* compiler, struct bpf_insn *pc)
+emit_read8(struct sljit_compiler* compiler, uint32_t k)
 {
 
 	return sljit_emit_op1(compiler,
 	    SLJIT_MOV_UB,
 	    BPFJIT_A, 0,
-	    SLJIT_MEM1(BPFJIT_BUF), pc->k);
+	    SLJIT_MEM1(BPFJIT_BUF), k);
 }
 
 /*
  * Generate code for BPF_LD+BPF_H+BPF_ABS    A <- P[k:2].
  */
 static int
-emit_ld_h_abs(struct sljit_compiler* compiler, struct bpf_insn *pc)
+emit_read16(struct sljit_compiler* compiler, uint32_t k)
 {
 	int status;
 
-	/* tmp1 = buf[pc->k]; */
+	/* tmp1 = buf[k]; */
 	status = sljit_emit_op1(compiler,
 	    SLJIT_MOV_UB,
 	    BPFJIT_TMP1, 0,
-	    SLJIT_MEM1(BPFJIT_BUF), pc->k);
+	    SLJIT_MEM1(BPFJIT_BUF), k);
 	if (status != SLJIT_SUCCESS)
 		return status;
 
-	/* tmp2 = buf[pc->k+1]; */
+	/* tmp2 = buf[k+1]; */
 	status = sljit_emit_op1(compiler,
 	    SLJIT_MOV_UB,
 	    BPFJIT_TMP2, 0,
-	    SLJIT_MEM1(BPFJIT_BUF), pc->k+1);
+	    SLJIT_MEM1(BPFJIT_BUF), k+1);
 	if (status != SLJIT_SUCCESS)
 		return status;
 
@@ -125,31 +125,31 @@ emit_ld_h_abs(struct sljit_compiler* compiler, struct bpf_insn *pc)
  * Generate code for BPF_LD+BPF_W+BPF_ABS    A <- P[k:4].
  */
 static int
-emit_ld_w_abs(struct sljit_compiler* compiler, struct bpf_insn *pc)
+emit_read32(struct sljit_compiler* compiler, uint32_t k)
 {
 	int status;
 
-	/* tmp1 = buf[pc->k]; */
+	/* tmp1 = buf[k]; */
 	status = sljit_emit_op1(compiler,
 	    SLJIT_MOV_UB,
 	    BPFJIT_TMP1, 0,
-	    SLJIT_MEM1(BPFJIT_BUF), pc->k);
+	    SLJIT_MEM1(BPFJIT_BUF), k);
 	if (status != SLJIT_SUCCESS)
 		return status;
 
-	/* tmp2 = buf[pc->k+1]; */
+	/* tmp2 = buf[k+1]; */
 	status = sljit_emit_op1(compiler,
 	    SLJIT_MOV_UB,
 	    BPFJIT_TMP2, 0,
-	    SLJIT_MEM1(BPFJIT_BUF), pc->k+1);
+	    SLJIT_MEM1(BPFJIT_BUF), k+1);
 	if (status != SLJIT_SUCCESS)
 		return status;
 
-	/* A = buf[pc->k+3]; */
+	/* A = buf[k+3]; */
 	status = sljit_emit_op1(compiler,
 	    SLJIT_MOV_UB,
 	    BPFJIT_A, 0,
-	    SLJIT_MEM1(BPFJIT_BUF), pc->k+3);
+	    SLJIT_MEM1(BPFJIT_BUF), k+3);
 	if (status != SLJIT_SUCCESS)
 		return status;
 
@@ -171,11 +171,11 @@ emit_ld_w_abs(struct sljit_compiler* compiler, struct bpf_insn *pc)
 	if (status != SLJIT_SUCCESS)
 		return status;
 
-	/* tmp1 = buf[pc->k+2]; */
+	/* tmp1 = buf[k+2]; */
 	status = sljit_emit_op1(compiler,
 	    SLJIT_MOV_UB,
 	    BPFJIT_TMP1, 0,
-	    SLJIT_MEM1(BPFJIT_BUF), pc->k+2);
+	    SLJIT_MEM1(BPFJIT_BUF), k+2);
 	if (status != SLJIT_SUCCESS)
 		return status;
 
@@ -633,13 +633,13 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 
 			switch (width) {
 			case 4:
-				status = emit_ld_w_abs(compiler, pc);
+				status = emit_read32(compiler, pc->k);
 				break;
 			case 2:
-				status = emit_ld_h_abs(compiler, pc);
+				status = emit_read16(compiler, pc->k);
 				break;
 			case 1:
-				status = emit_ld_b_abs(compiler, pc);
+				status = emit_read8(compiler, pc->k);
 				break;
 			}
 
