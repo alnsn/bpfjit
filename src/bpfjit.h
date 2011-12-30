@@ -31,6 +31,8 @@
 #define _NET_BPFJIT_H_
 
 #ifdef __linux
+#include <stdint.h>
+#include <sys/types.h>
 #include <pcap-bpf.h>
 #else
 #include <net/bpf.h>
