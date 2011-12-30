@@ -1,4 +1,3 @@
-
 /*-
  * Copyright (c) 2011 Alexander Nasonov.
  * All rights reserved.
@@ -342,6 +341,7 @@ test_alu_neg(void)
 void
 test_alu(void)
 {
+
 	test_alu_add_k();
 	test_alu_sub_k();
 	test_alu_mul_k();

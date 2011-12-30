@@ -35,37 +35,15 @@
 #include "tests.h"
 
 static void
-test_misc_tax(void)
+test_jmp_ja(void)
 {
 	static struct bpf_insn insns[] = {
-		BPF_STMT(BPF_LD+BPF_IMM, 3),
-		BPF_STMT(BPF_MISC+BPF_TAX, 0),
-		BPF_STMT(BPF_LD+BPF_B+BPF_IND, 2),
-		BPF_STMT(BPF_RET+BPF_A, 0)
-	};
-
-	void *code;
-	uint8_t pkt[] = { 0, 11, 22, 33, 44, 55 };
-
-	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
-
-	REQUIRE(bpf_validate(insns, insn_count));
-
-	code = bpfjit_generate_code(insns, insn_count);
-	REQUIRE(code != NULL);
-
-	CHECK(bpfjit_execute_code(pkt, sizeof(pkt), sizeof(pkt), code) == 55);
-
-	bpfjit_free_code(code);
-}
-
-static void
-test_misc_txa(void)
-{
-	static struct bpf_insn insns[] = {
-		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 391),
-		BPF_STMT(BPF_MISC+BPF_TXA, 0),
-		BPF_STMT(BPF_RET+BPF_A, 0)
+		BPF_STMT(BPF_JMP+BPF_JA, 1),
+		BPF_STMT(BPF_RET+BPF_A, 0),
+		BPF_STMT(BPF_RET+BPF_A, UINT32_MAX),
+		BPF_STMT(BPF_RET+BPF_A, 1),
+		BPF_STMT(BPF_RET+BPF_A, 2),
+		BPF_STMT(BPF_RET+BPF_A, 3),
 	};
 
 	void *code;
@@ -78,15 +56,52 @@ test_misc_txa(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 391);
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_MAX);
+
+	bpfjit_free_code(code);
+}
+
+static void
+test_jmp_gt_k(void)
+{
+	static struct bpf_insn insns[] = {
+		BPF_JUMP(BPF_JMP+BPF_JGT, 1, 0, 1),
+		BPF_STMT(BPF_RET+BPF_A, 0),
+		BPF_STMT(BPF_LD+BPF_IMM, 2),
+		BPF_JUMP(BPF_JMP+BPF_JGT, 1, 1, 0),
+		BPF_STMT(BPF_RET+BPF_A, 1),
+		BPF_JUMP(BPF_JMP+BPF_JGT, 2, 1, 1),
+		BPF_STMT(BPF_RET+BPF_A, 2),
+		BPF_JUMP(BPF_JMP+BPF_JGT, UINT32_MAX, 2, 3),
+		BPF_STMT(BPF_RET+BPF_A, 3),
+		BPF_STMT(BPF_RET+BPF_A, 4),
+		BPF_STMT(BPF_RET+BPF_A, 5),
+		BPF_JUMP(BPF_JMP+BPF_JGT, 0, 3, 1),
+		BPF_STMT(BPF_RET+BPF_A, 6),
+		BPF_STMT(BPF_RET+BPF_A, UINT32_MAX),
+		BPF_STMT(BPF_RET+BPF_A, 7),
+		BPF_STMT(BPF_RET+BPF_A, 8)
+	};
+
+	void *code;
+	uint8_t pkt[1]; /* the program doesn't read any data */
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	REQUIRE(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_MAX);
 
 	bpfjit_free_code(code);
 }
 
 void
-test_misc(void)
+test_jmp(void)
 {
 
-	test_misc_tax();
-	test_misc_txa();
+	test_jmp_ja();
+	test_jmp_gt_k();
 }

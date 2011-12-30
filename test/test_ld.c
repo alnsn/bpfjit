@@ -194,6 +194,7 @@ test_ld_imm(void)
 void
 test_ld(void)
 {
+
 	test_ld_abs();
 	test_ld_ind();
 	test_ld_len();

@@ -142,6 +142,7 @@ test_ldx_len2(void)
 void
 test_ldx(void)
 {
+
 	test_ldx_imm1();
 	test_ldx_imm2();
 	test_ldx_len1();
