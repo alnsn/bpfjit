@@ -58,13 +58,16 @@ static struct bpf_insn insns[] = {
 	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x80037023, 0, 3),
 	BPF_STMT(BPF_LD+BPF_W+BPF_ABS, 30),
 	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x8003700f, 0, 1),
-	BPF_STMT(BPF_RET+BPF_K, (u_int)-1),
+	BPF_STMT(BPF_RET+BPF_K, UINT32_MAX),
 	BPF_STMT(BPF_RET+BPF_K, 0),
 };
 
 /* XXX change to matching packet */
 static uint8_t pkt[128] = {
-	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0x08, 0x00
+	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0x08, 0x00,
+	14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+	0x80, 0x03, 0x70, 0x0f,
+	0x80, 0x03, 0x70, 0x23
 };
 
 void
@@ -77,7 +80,7 @@ test_bpfjit(size_t counter, size_t dummy)
 	code = bpfjit_generate_code(insns, sizeof(insns) / sizeof(insns[0]));
 
 	for (i = 0; i < counter; i++)
-		ret += bpfjit_execute_code(pkt, 32, 16, code);
+		ret += bpfjit_execute_code(pkt, sizeof(pkt), sizeof(pkt), code);
 
 	bpfjit_free_code(code);
 
