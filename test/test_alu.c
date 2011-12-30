@@ -268,6 +268,54 @@ test_alu_or_k(void)
 }
 
 static void
+test_alu_lsh_k(void)
+{
+	static struct bpf_insn insns[] = {
+		BPF_STMT(BPF_LD+BPF_IMM, 0xdeadbeef),
+		BPF_STMT(BPF_ALU+BPF_LSH+BPF_K, 16),
+		BPF_STMT(BPF_RET+BPF_A, 0)
+	};
+
+	void *code;
+	uint8_t pkt[1]; /* the program doesn't read any data */
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	REQUIRE(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0xbeef0000);
+
+	bpfjit_free_code(code);
+}
+
+static void
+test_alu_rsh_k(void)
+{
+	static struct bpf_insn insns[] = {
+		BPF_STMT(BPF_LD+BPF_IMM, 0xdeadbeef),
+		BPF_STMT(BPF_ALU+BPF_RSH+BPF_K, 16),
+		BPF_STMT(BPF_RET+BPF_A, 0)
+	};
+
+	void *code;
+	uint8_t pkt[1]; /* the program doesn't read any data */
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	REQUIRE(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0x0000dead);
+
+	bpfjit_free_code(code);
+}
+
+static void
 test_alu_neg(void)
 {
 	static struct bpf_insn insns[] = {
@@ -304,5 +352,7 @@ test_alu(void)
 	test_alu_div2147483648_k();
 	test_alu_and_k();
 	test_alu_or_k();
+	test_alu_lsh_k();
+	test_alu_rsh_k();
 	test_alu_neg();
 }
