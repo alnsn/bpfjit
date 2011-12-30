@@ -423,7 +423,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	int status;
 	int width;
 	unsigned int rval, mode;
-	int num_used_memwords;
+	int minm, maxm; /* min/max k for M[k] */
 	unsigned int opts;
 	struct sljit_compiler* compiler;
 
@@ -453,8 +453,8 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	oob = NULL;
 
 	opts = bpfjit_optimization_hints(insns, insn_count);
-
-	num_used_memwords = 0; /* XXX implement */
+	minm = opts & 0xff;
+	maxm = (opts >> 8) & 0xff;
 
 	jumps = calloc(insn_count, sizeof(jumps[0]));
 	if (jumps == NULL)
@@ -489,7 +489,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 #endif
 
 	status = sljit_emit_enter(compiler, 3, 4, 3,
-	    num_used_memwords * sizeof(uint32_t));
+	    (minm > maxm ? 0 : maxm - minm + 1) * sizeof(uint32_t));
 	if (status != SLJIT_SUCCESS)
 		goto fail;
 
@@ -911,6 +911,7 @@ bpfjit_execute_code(const uint8_t *p, unsigned int wirelen,
 		    sljit_uw wirelen, sljit_uw buflen);
 	} func = { code };
 
+	/* XXX sljit_uw != unsigned int */
 	return func.func(p, wirelen, buflen);
 }
 
