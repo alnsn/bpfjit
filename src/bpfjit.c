@@ -215,6 +215,25 @@ emit_read32(struct sljit_compiler* compiler, uint32_t k)
 	return status;
 }
 
+static int
+emit_pow2_division(struct sljit_compiler* compiler, uint32_t k)
+{
+	int shift = 0;
+
+	while (k > 1) {
+		k >>= 1;
+		shift++;
+	}
+
+	assert(k == 1 && shift < 32);
+
+	return sljit_emit_op2(compiler,
+	    SLJIT_LSHR,
+	    BPFJIT_A, 0,
+	    BPFJIT_A, 0,
+	    SLJIT_IMM, shift);
+}
+
 /*
  * Count out-of-bounds jumps in BPF_LD and BPF_LDX instructions.
  */
@@ -273,7 +292,7 @@ bpf_alu_to_sljit_op(struct bpf_insn *pc)
 	case BPF_OR:  return SLJIT_OR;
 	case BPF_AND: return SLJIT_AND;
 	case BPF_LSH: return SLJIT_INT_OP|SLJIT_SHL;
-	case BPF_RSH: return SLJIT_INT_OP|SLJIT_LSHR; /* XXX or SLJIT_ASHR? */
+	case BPF_RSH: return SLJIT_INT_OP|SLJIT_LSHR;
 	default:
 		assert(false);
 	}
@@ -716,9 +735,20 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			}
 
 			if (BPF_OP(pc->code) == BPF_DIV) {
-				if (pc->k == 0)
-					goto fail;
-				continue;
+				if (BPF_SRC(pc->code) == BPF_K) {
+					if (pc->k == 0)
+						goto fail;
+					/* power of 2? */
+					if (pc->k & (pc->k - 1))
+						goto fail; /* XXX implement */
+					status = emit_pow2_division(compiler, pc->k);
+					if (status != SLJIT_SUCCESS)
+						goto fail;
+					continue;
+				}
+
+				/* XXX implement */
+				goto fail;
 			}
 
 			status = sljit_emit_op2(compiler,
