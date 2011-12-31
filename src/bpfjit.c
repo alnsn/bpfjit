@@ -957,8 +957,8 @@ fail:
 }
 
 unsigned int
-bpfjit_execute_code(const uint8_t *p, unsigned int wirelen,
-    unsigned int buflen, const void *code)
+bpfjit_execute_code(const uint8_t *p, size_t wirelen,
+    size_t buflen, const void *code)
 {
 	union
 	{

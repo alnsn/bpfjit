@@ -30,6 +30,8 @@
 #ifndef _NET_BPFJIT_H_
 #define _NET_BPFJIT_H_
 
+#include <stddef.h>
+
 #ifdef __linux
 #include <stdint.h>
 #include <sys/types.h>
@@ -42,7 +44,7 @@ void *bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count);
 void bpfjit_free_code(void *code);
 
 unsigned int
-bpfjit_execute_code(const uint8_t *p, unsigned int wirelen,
-    unsigned int buflen, const void *code);
+bpfjit_execute_code(const uint8_t *p, size_t wirelen,
+    size_t buflen, const void *code);
 
 #endif /* !_NET_BPFJIT_H_ */
