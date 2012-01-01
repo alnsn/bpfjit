@@ -240,91 +240,61 @@ emit_pow2_division(struct sljit_compiler* compiler, uint32_t k)
 	return status;
 }
 
-#if defined(SLJIT_64BIT_ARCHITECTURE) && SLJIT_64BIT_ARCHITECTURE
+static uint32_t
+divide(uint32_t x, uint32_t y)
+{
 
+	return x / y;
+}
+
+/*
+ * Generate A = A / div.
+ * divt,divw are either SLJIT_IMM,pc->k or BPFJIT_X,0.
+ */
 static int
-emit_division(struct sljit_compiler* compiler, uint32_t k)
+emit_division(struct sljit_compiler* compiler, int divt, sljit_w divw)
 {
 	int status;
-	uint32_t m;
-	uint8_t s1, s2;
 
-	fast_divide32_prepare(k, &m, &s1, &s2);
+#if BPFJIT_X == SLJIT_TEMPORARY_REG1 || \
+    BPFJIT_X == SLJIT_RETURN_REG     || \
+    BPFJIT_X == SLJIT_TEMPORARY_REG2 || \
+    BPFJIT_A == SLJIT_TEMPORARY_REG2
+/* We don't save A and X. */
+#error "Not supported assignment of registers."
+#endif
 
-	/* tmp1 = A * m; */
-	status = sljit_emit_op2(compiler,
-	    SLJIT_MUL,
-	    BPFJIT_TMP1, 0,
-	    BPFJIT_A, 0,
-	    SLJIT_IMM, m);
+#if BPFJIT_A != SLJIT_TEMPORARY_REG1
+	status = sljit_emit_op1(compiler,
+	    SLJIT_MOV,
+	    SLJIT_TEMPORARY_REG1, 0,
+	    BPFJIT_A, 0);
+	if (status != SLJIT_SUCCESS)
+		return status;
+#endif
+
+	status = sljit_emit_op1(compiler,
+	    SLJIT_MOV,
+	    SLJIT_TEMPORARY_REG2, 0,
+	    divt, divw);
 	if (status != SLJIT_SUCCESS)
 		return status;
 
-	/* tmp1 = tmp1 >> 32; */
-	status = sljit_emit_op2(compiler,
-	    SLJIT_LSHR,
-	    BPFJIT_TMP1, 0,
-	    BPFJIT_TMP1, 0,
-	    SLJIT_IMM, 32);
+	status = sljit_emit_ijump(compiler,
+	    SLJIT_CALL2,
+	    SLJIT_IMM, SLJIT_FUNC_OFFSET(divide));
+
+#if BPFJIT_A != SLJIT_RETURN_REG
+	status = sljit_emit_op1(compiler,
+	    SLJIT_MOV,
+	    BPFJIT_A, 0,
+	    SLJIT_RETURN_REG, 0);
 	if (status != SLJIT_SUCCESS)
 		return status;
-
-	/* A = A - tmp1; */
-	status = sljit_emit_op2(compiler,
-	    SLJIT_SUB,
-	    BPFJIT_A, 0,
-	    BPFJIT_A, 0,
-	    BPFJIT_TMP1, 0);
-	if (status != SLJIT_SUCCESS)
-		return status;
-
-	if (s1 != 0) {
-		/* A = A >> s1; */
-		status = sljit_emit_op2(compiler,
-		    SLJIT_LSHR,
-		    BPFJIT_A, 0,
-		    BPFJIT_A, 0,
-		    SLJIT_IMM, s1);
-		if (status != SLJIT_SUCCESS)
-			return status;
-	}
-
-	/* A = A + tmp1; */
-	status = sljit_emit_op2(compiler,
-	    SLJIT_ADD,
-	    BPFJIT_A, 0,
-	    BPFJIT_A, 0,
-	    BPFJIT_TMP1, 0);
-	if (status != SLJIT_SUCCESS)
-		return status;
-
-	if (s2 != 0) {
-		/* A = A >> s2; */
-		status = sljit_emit_op2(compiler,
-		    SLJIT_LSHR,
-		    BPFJIT_A, 0,
-		    BPFJIT_A, 0,
-		    SLJIT_IMM, s2);
-		if (status != SLJIT_SUCCESS)
-			return status;
-	}
+#endif
 
 	return status;
-
-
 }
-
-#else
-
-static int
-emit_division(struct sljit_compiler* compiler, uint32_t k)
-{
-
-	/* XXX it's a misuse of SLJIT_ERR_UNSUPPORTED */
-	return SLJIT_ERR_UNSUPPORTED;
-}
-
-#endif
 
 /*
  * Count out-of-bounds jumps in BPF_LD and BPF_LDX instructions.
@@ -826,31 +796,37 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				continue;
 			}
 
-			if (BPF_OP(pc->code) == BPF_DIV) {
-				if (BPF_SRC(pc->code) == BPF_K) {
-					if (pc->k == 0)
-						goto fail;
-					status = (pc->k & (pc->k - 1)) ?
-					    emit_division(compiler, pc->k) :
-					    emit_pow2_division(compiler, pc->k);
-					if (status != SLJIT_SUCCESS)
-						goto fail;
-					continue;
-				}
-
-				/* XXX implement */
-				goto fail;
+			if (BPF_OP(pc->code) != BPF_DIV) {
+				status = sljit_emit_op2(compiler,
+				    bpf_alu_to_sljit_op(pc),
+				    BPFJIT_A, 0,
+				    BPFJIT_A, 0,
+				    kx_to_reg(pc), kx_to_reg_arg(pc));
+				if (status != SLJIT_SUCCESS)
+					goto fail;
+				continue;
 			}
 
-			status = sljit_emit_op2(compiler,
-			    bpf_alu_to_sljit_op(pc),
-			    BPFJIT_A, 0,
-			    BPFJIT_A, 0,
-			    kx_to_reg(pc), kx_to_reg_arg(pc));
-			if (status != SLJIT_SUCCESS)
-				goto fail;
+			/* BPF_DIV */
+			switch (BPF_SRC(pc->code)) {
+			case BPF_K:
+				if (pc->k == 0)
+					goto fail;
+				status = (pc->k & (pc->k - 1)) == 0 ?
+    				    emit_pow2_division(compiler, pc->k) :
+				    emit_division(compiler, SLJIT_IMM, pc->k);
+				if (status != SLJIT_SUCCESS)
+					goto fail;
+				continue;
+			case BPF_X:
+				/* XXX division by zero */
+				status = emit_division(compiler,
+				    BPFJIT_X, 0);
+				if (status != SLJIT_SUCCESS)
+					goto fail;
+			}
 
-			continue;
+			goto fail;
 
 		case BPF_JMP:
 
