@@ -220,6 +220,7 @@ static int
 emit_pow2_division(struct sljit_compiler* compiler, uint32_t k)
 {
 	int shift = 0;
+	int status = SLJIT_SUCCESS;
 
 	while (k > 1) {
 		k >>= 1;
@@ -228,11 +229,15 @@ emit_pow2_division(struct sljit_compiler* compiler, uint32_t k)
 
 	assert(k == 1 && shift < 32);
 
-	return sljit_emit_op2(compiler,
-	    SLJIT_LSHR,
-	    BPFJIT_A, 0,
-	    BPFJIT_A, 0,
-	    SLJIT_IMM, shift);
+	if (shift != 0) {
+		status = sljit_emit_op2(compiler,
+		    SLJIT_LSHR,
+		    BPFJIT_A, 0,
+		    BPFJIT_A, 0,
+		    SLJIT_IMM, shift);
+	}
+
+	return status;
 }
 
 #if defined(SLJIT_64BIT_ARCHITECTURE) && SLJIT_64BIT_ARCHITECTURE
