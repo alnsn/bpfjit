@@ -285,7 +285,7 @@ test_alu_and_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0x9ebd);
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == (0xdead&0xbeef));
 
 	bpfjit_free_code(code);
 }
