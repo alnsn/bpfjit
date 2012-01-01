@@ -28,7 +28,6 @@
  */
 
 #include "bpfjit.h"
-#include "bitops.h"
 
 #include <assert.h>
 #include <stdbool.h>
