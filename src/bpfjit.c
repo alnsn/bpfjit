@@ -699,8 +699,8 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			if (width == -1)
 				goto fail;
 
-			/* overflow check for pc->k + width */
 			if (pc->k > UINT32_MAX - width) {
+				/* return 0; */
 				jump = sljit_emit_jump(compiler, SLJIT_JUMP);
 			} else {
 				/* if (pc->k + width > buflen) return 0; */
