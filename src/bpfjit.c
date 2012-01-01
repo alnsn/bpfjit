@@ -336,6 +336,8 @@ count_ret0_jumps(struct bpf_insn *insns, size_t insn_count)
 		case BPF_ALU:
 			if (pc->code == (BPF_ALU|BPF_DIV|BPF_X))
 				rv++;
+			if (pc->code == (BPF_ALU|BPF_DIV|BPF_K) && pc->k == 0)
+				rv++;
 			break;
 		}
 	}
@@ -634,6 +636,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				    SLJIT_IMM, pc->k);
 				if (status != SLJIT_SUCCESS)
 					goto fail;
+
 				continue;
 			}
 
@@ -651,6 +654,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				    BPFJIT_WIRELEN, 0);
 				if (status != SLJIT_SUCCESS)
 					goto fail;
+
 				continue;
 			}
 
@@ -762,6 +766,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				    SLJIT_IMM, pc->k);
 				if (status != SLJIT_SUCCESS)
 					goto fail;
+
 				continue;
 			}
 
@@ -775,6 +780,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				    BPFJIT_WIRELEN, 0);
 				if (status != SLJIT_SUCCESS)
 					goto fail;
+
 				continue;
 			}
 
@@ -794,6 +800,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				    BPFJIT_A, 0);
 				if (status != SLJIT_SUCCESS)
 					goto fail;
+
 				continue;
 			}
 
@@ -805,20 +812,31 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				    kx_to_reg(pc), kx_to_reg_arg(pc));
 				if (status != SLJIT_SUCCESS)
 					goto fail;
+
 				continue;
 			}
 
 			/* BPF_DIV */
 			switch (BPF_SRC(pc->code)) {
 			case BPF_K:
-				if (pc->k == 0)
-					goto fail;
+				if (pc->k == 0) {
+					jump = sljit_emit_jump(compiler,
+					    SLJIT_JUMP);
+					if (jump == NULL)
+						goto fail;
+					ret0[ret0_size++] = jump;
+
+					continue;
+				}
+
 				status = (pc->k & (pc->k - 1)) == 0 ?
     				    emit_pow2_division(compiler, pc->k) :
 				    emit_division(compiler, SLJIT_IMM, pc->k);
 				if (status != SLJIT_SUCCESS)
 					goto fail;
+
 				continue;
+
 			case BPF_X:
 				jump = sljit_emit_cmp(compiler,
 				    SLJIT_C_EQUAL,
@@ -832,6 +850,8 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				    BPFJIT_X, 0);
 				if (status != SLJIT_SUCCESS)
 					goto fail;
+
+				continue;
 			}
 
 			goto fail;
@@ -951,6 +971,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				    BPFJIT_A, 0);
 				if (status != SLJIT_SUCCESS)
 					goto fail;
+
 				continue;
 			}
 
@@ -961,6 +982,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				    BPFJIT_X, 0);
 				if (status != SLJIT_SUCCESS)
 					goto fail;
+
 				continue;
 			}
 
