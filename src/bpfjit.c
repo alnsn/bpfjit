@@ -28,6 +28,7 @@
  */
 
 #include "bpfjit.h"
+#include "bitops.h"
 
 #include <assert.h>
 #include <stdbool.h>
@@ -233,6 +234,92 @@ emit_pow2_division(struct sljit_compiler* compiler, uint32_t k)
 	    BPFJIT_A, 0,
 	    SLJIT_IMM, shift);
 }
+
+#if defined(SLJIT_64BIT_ARCHITECTURE) && SLJIT_64BIT_ARCHITECTURE
+
+static int
+emit_division(struct sljit_compiler* compiler, uint32_t k)
+{
+	int status;
+	uint32_t m;
+	uint8_t s1, s2;
+
+	fast_divide32_prepare(k, &m, &s1, &s2);
+
+	/* tmp1 = A * m; */
+	status = sljit_emit_op2(compiler,
+	    SLJIT_MUL,
+	    BPFJIT_TMP1, 0,
+	    BPFJIT_A, 0,
+	    SLJIT_IMM, m);
+	if (status != SLJIT_SUCCESS)
+		return status;
+
+	/* tmp1 = tmp1 >> 32; */
+	status = sljit_emit_op2(compiler,
+	    SLJIT_LSHR,
+	    BPFJIT_TMP1, 0,
+	    BPFJIT_TMP1, 0,
+	    SLJIT_IMM, 32);
+	if (status != SLJIT_SUCCESS)
+		return status;
+
+	/* A = A - tmp1; */
+	status = sljit_emit_op2(compiler,
+	    SLJIT_SUB,
+	    BPFJIT_A, 0,
+	    BPFJIT_A, 0,
+	    BPFJIT_TMP1, 0);
+	if (status != SLJIT_SUCCESS)
+		return status;
+
+	if (s1 != 0) {
+		/* A = A >> s1; */
+		status = sljit_emit_op2(compiler,
+		    SLJIT_LSHR,
+		    BPFJIT_A, 0,
+		    BPFJIT_A, 0,
+		    SLJIT_IMM, s1);
+		if (status != SLJIT_SUCCESS)
+			return status;
+	}
+
+	/* A = A + tmp1; */
+	status = sljit_emit_op2(compiler,
+	    SLJIT_ADD,
+	    BPFJIT_A, 0,
+	    BPFJIT_A, 0,
+	    BPFJIT_TMP1, 0);
+	if (status != SLJIT_SUCCESS)
+		return status;
+
+	if (s2 != 0) {
+		/* A = A >> s2; */
+		status = sljit_emit_op2(compiler,
+		    SLJIT_LSHR,
+		    BPFJIT_A, 0,
+		    BPFJIT_A, 0,
+		    SLJIT_IMM, s2);
+		if (status != SLJIT_SUCCESS)
+			return status;
+	}
+
+	return status;
+
+
+}
+
+#else
+
+static int
+emit_division(struct sljit_compiler* compiler, uint32_t k)
+{
+
+	/* XXX it's a misuse of SLJIT_ERR_UNSUPPORTED */
+	return SLJIT_ERR_UNSUPPORTED;
+}
+
+#endif
 
 /*
  * Count out-of-bounds jumps in BPF_LD and BPF_LDX instructions.
@@ -738,10 +825,9 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				if (BPF_SRC(pc->code) == BPF_K) {
 					if (pc->k == 0)
 						goto fail;
-					/* power of 2? */
-					if (pc->k & (pc->k - 1))
-						goto fail; /* XXX implement */
-					status = emit_pow2_division(compiler, pc->k);
+					status = (pc->k & (pc->k - 1)) ?
+					    emit_division(compiler, pc->k) :
+					    emit_pow2_division(compiler, pc->k);
 					if (status != SLJIT_SUCCESS)
 						goto fail;
 					continue;

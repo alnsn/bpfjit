@@ -195,6 +195,54 @@ test_alu_div4_k(void)
 }
 
 static void
+test_alu_div10_k(void)
+{
+	static struct bpf_insn insns[] = {
+		BPF_STMT(BPF_LD+BPF_IMM, UINT32_C(4294843849)),
+		BPF_STMT(BPF_ALU+BPF_DIV+BPF_K, 10),
+		BPF_STMT(BPF_RET+BPF_A, 0)
+	};
+
+	void *code;
+	uint8_t pkt[1]; /* the program doesn't read any data */
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	REQUIRE(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_C(429484384));
+
+	bpfjit_free_code(code);
+}
+
+static void
+test_alu_div7609801_k(void)
+{
+	static struct bpf_insn insns[] = {
+		BPF_STMT(BPF_LD+BPF_IMM, UINT32_C(4294967295)),
+		BPF_STMT(BPF_ALU+BPF_DIV+BPF_K, UINT32_C(7609801)),
+		BPF_STMT(BPF_RET+BPF_A, 0)
+	};
+
+	void *code;
+	uint8_t pkt[1]; /* the program doesn't read any data */
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	REQUIRE(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 564);
+
+	bpfjit_free_code(code);
+}
+
+static void
 test_alu_div2147483648_k(void)
 {
 	static struct bpf_insn insns[] = {
@@ -349,6 +397,8 @@ test_alu(void)
 	test_alu_div1_k();
 	test_alu_div2_k();
 	test_alu_div4_k();
+	test_alu_div10_k();
+	test_alu_div7609801_k();
 	test_alu_div2147483648_k();
 	test_alu_and_k();
 	test_alu_or_k();
