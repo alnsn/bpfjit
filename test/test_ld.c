@@ -90,6 +90,55 @@ test_ld_abs(void)
 }
 
 static void
+test_ld_abs_overflow(void)
+{
+	static struct bpf_insn insns[6][2] = {
+		{
+			BPF_STMT(BPF_LD+BPF_H+BPF_ABS, UINT32_MAX),
+			BPF_STMT(BPF_RET+BPF_A, 0)
+		},
+		{
+			BPF_STMT(BPF_LD+BPF_H+BPF_ABS, UINT32_MAX - 1),
+			BPF_STMT(BPF_RET+BPF_A, 0)
+		},
+		{
+			BPF_STMT(BPF_LD+BPF_W+BPF_ABS, UINT32_MAX),
+			BPF_STMT(BPF_RET+BPF_A, 0)
+		},
+		{
+			BPF_STMT(BPF_LD+BPF_W+BPF_ABS, UINT32_MAX - 1),
+			BPF_STMT(BPF_RET+BPF_A, 0)
+		},
+		{
+			BPF_STMT(BPF_LD+BPF_W+BPF_ABS, UINT32_MAX - 2),
+			BPF_STMT(BPF_RET+BPF_A, 0)
+		},
+		{
+			BPF_STMT(BPF_LD+BPF_W+BPF_ABS, UINT32_MAX - 3),
+			BPF_STMT(BPF_RET+BPF_A, 0)
+		},
+	};
+
+	int i;
+	uint8_t pkt[1]; /* the program doesn't read any data */
+
+	size_t insn_count = sizeof(insns[0]) / sizeof(insns[0][0]);
+
+	for (i = 0; i < 3; i++) {
+		void *code;
+
+		REQUIRE(bpf_validate(insns[i], insn_count));
+
+		code = bpfjit_generate_code(insns[i], insn_count);
+		REQUIRE(code != NULL);
+
+		CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0);
+
+		bpfjit_free_code(code);
+	}
+}
+
+static void
 test_ld_ind(void)
 {
 	static struct bpf_insn insns[3][3] = {
@@ -138,6 +187,55 @@ test_ld_ind(void)
 
 		l = pktsize;
 		CHECK(bpfjit_execute_code(pkt, l, l, code) == expected[i]);
+
+		bpfjit_free_code(code);
+	}
+}
+
+static void
+test_ld_ind_overflow(void)
+{
+	static struct bpf_insn insns[6][2] = {
+		{
+			BPF_STMT(BPF_LD+BPF_H+BPF_IND, UINT32_MAX),
+			BPF_STMT(BPF_RET+BPF_A, 0)
+		},
+		{
+			BPF_STMT(BPF_LD+BPF_H+BPF_IND, UINT32_MAX - 1),
+			BPF_STMT(BPF_RET+BPF_A, 0)
+		},
+		{
+			BPF_STMT(BPF_LD+BPF_W+BPF_IND, UINT32_MAX),
+			BPF_STMT(BPF_RET+BPF_A, 0)
+		},
+		{
+			BPF_STMT(BPF_LD+BPF_W+BPF_IND, UINT32_MAX - 1),
+			BPF_STMT(BPF_RET+BPF_A, 0)
+		},
+		{
+			BPF_STMT(BPF_LD+BPF_W+BPF_IND, UINT32_MAX - 2),
+			BPF_STMT(BPF_RET+BPF_A, 0)
+		},
+		{
+			BPF_STMT(BPF_LD+BPF_W+BPF_IND, UINT32_MAX - 3),
+			BPF_STMT(BPF_RET+BPF_A, 0)
+		},
+	};
+
+	int i;
+	uint8_t pkt[1]; /* the program doesn't read any data */
+
+	size_t insn_count = sizeof(insns[0]) / sizeof(insns[0][0]);
+
+	for (i = 0; i < 3; i++) {
+		void *code;
+
+		REQUIRE(bpf_validate(insns[i], insn_count));
+
+		code = bpfjit_generate_code(insns[i], insn_count);
+		REQUIRE(code != NULL);
+
+		CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0);
 
 		bpfjit_free_code(code);
 	}
@@ -196,7 +294,9 @@ test_ld(void)
 {
 
 	test_ld_abs();
+	test_ld_abs_overflow();
 	test_ld_ind();
+	test_ld_ind_overflow();
 	test_ld_len();
 	test_ld_imm();
 }
