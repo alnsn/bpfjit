@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2011 Alexander Nasonov.
+ * Copyright (c) 2011-2012 Alexander Nasonov.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,6 +29,7 @@
 
 #include <bpfjit.h>
 
+#include <err.h>
 #include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -40,9 +41,12 @@
 #include <net/ethertypes.h>
 #endif
 
+unsigned int filter_pkt(uint8_t *pkt, size_t wirelen, size_t buflen);
+
 void usage(const char *prog);
 void test_bpf_filter(size_t counter, size_t dummy);
 void test_bpfjit(size_t counter, size_t dummy);
+void test_c(size_t counter, size_t dummy);
 
 /*
  * From bpf(4): This filter accepts only IP packets between host
@@ -62,13 +66,27 @@ static struct bpf_insn insns[] = {
 	BPF_STMT(BPF_RET+BPF_K, 0),
 };
 
-/* XXX change to matching packet */
-static uint8_t pkt[128] = {
+static uint8_t test_pkt[128] = {
 	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0x08, 0x00,
 	14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
 	0x80, 0x03, 0x70, 0x0f,
 	0x80, 0x03, 0x70, 0x23
 };
+
+
+
+void
+test_c(size_t counter, size_t dummy)
+{
+	size_t i;
+	unsigned int ret = 0;
+
+	for (i = 0; i < counter; i++)
+		ret += filter_pkt(test_pkt, sizeof(test_pkt), sizeof(test_pkt));
+
+	if (counter == dummy)
+		printf("C code returned %u\n", ret);
+}
 
 void
 test_bpfjit(size_t counter, size_t dummy)
@@ -79,8 +97,10 @@ test_bpfjit(size_t counter, size_t dummy)
 
 	code = bpfjit_generate_code(insns, sizeof(insns) / sizeof(insns[0]));
 
-	for (i = 0; i < counter; i++)
-		ret += bpfjit_execute_code(pkt, sizeof(pkt), sizeof(pkt), code);
+	for (i = 0; i < counter; i++) {
+		ret += bpfjit_execute_code(test_pkt,
+		    sizeof(test_pkt), sizeof(test_pkt), code);
+	}
 
 	bpfjit_free_code(code);
 
@@ -94,8 +114,10 @@ test_bpf_filter(size_t counter, size_t dummy)
 	size_t i;
 	unsigned int ret = 0;
 
-	for (i = 0; i < counter; i++)
-		ret += bpf_filter(insns, pkt, sizeof(pkt), sizeof(pkt));
+	for (i = 0; i < counter; i++) {
+		ret += bpf_filter(insns, test_pkt,
+		    sizeof(test_pkt), sizeof(test_pkt));
+	}
 
 	if (counter == dummy)
 		printf("bpf_filter returned %u\n", ret);
@@ -105,32 +127,45 @@ void usage(const char *prog)
 {
 
 	fprintf(stderr,
-	    "USAGE: time %s [-]NNN\n"
-	    "  NNN - number of iterations\n"
-	    "        positive - run bpfjit_execute_code\n"
-	    "        negative - rune bpf_filter\n", prog);
+	    "USAGE: time %s -b|-j|-c NNN\n"
+	    " -j  - run bpfjit_execute_code\n"
+	    " -b  - run bpf_filter\n"
+	    " -c  - run C code\n"
+	    " NNN - number of iterations\n", prog);
 }
 
 int main(int argc, char* argv[])
 {
 	int dummy;
+	char cmd;
 	double counter;
 
 	dummy = (argc == INT_MAX - 1) ? argv[argc-1][0] : 1;
 
-	if (argc == 1 || (counter = strtod(argv[1], NULL)) == 0 ||
-	    abs(counter) > SIZE_MAX) {
-		usage(argv[0]);
+	if (argc == 3) {
+		cmd = argv[1][1];
+		counter = strtod(argv[2], NULL);
+		if (counter < 0 || counter > UINT32_MAX)
+			counter = 1;
+	} else {
+		cmd = 'j';
 		counter = 1;
+		usage(argv[0]);
 	}
 
 	if (!bpf_validate(insns, sizeof(insns) / sizeof(insns[0])))
 		errx(EXIT_FAILURE, "Not valid bpf program");
 
-	if (counter > 0)
+	switch (cmd) {
+	case 'j':
 		test_bpfjit(counter, dummy);
-	else
-		test_bpf_filter(-counter, dummy);
+		break;
+	case 'b':
+		test_bpf_filter(counter, dummy);
+		break;
+	case 'c':
+		test_c(counter, dummy);
+	}
 
 	return EXIT_SUCCESS;
 }

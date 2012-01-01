@@ -1,5 +1,7 @@
 PROG=	bpfjit_benchmark
-SRCS=	benchmark.c
+SRCS=	benchmark.c c.c
+
+WARNS=	4
 
 COPTS+=		-O2 -g
 CPPFLAGS+=	-I ../src
