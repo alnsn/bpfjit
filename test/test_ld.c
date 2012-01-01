@@ -120,7 +120,7 @@ test_ld_abs_overflow(void)
 	};
 
 	int i;
-	uint8_t pkt[1]; /* the program doesn't read any data */
+	uint8_t pkt[8]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns[0]) / sizeof(insns[0][0]);
 
@@ -132,7 +132,7 @@ test_ld_abs_overflow(void)
 		code = bpfjit_generate_code(insns[i], insn_count);
 		REQUIRE(code != NULL);
 
-		CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0);
+		CHECK(bpfjit_execute_code(pkt, 8, 8, code) == 0);
 
 		bpfjit_free_code(code);
 	}
@@ -223,7 +223,7 @@ test_ld_ind_overflow(void)
 	};
 
 	int i;
-	uint8_t pkt[1]; /* the program doesn't read any data */
+	uint8_t pkt[8]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns[0]) / sizeof(insns[0][0]);
 
@@ -235,7 +235,7 @@ test_ld_ind_overflow(void)
 		code = bpfjit_generate_code(insns[i], insn_count);
 		REQUIRE(code != NULL);
 
-		CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0);
+		CHECK(bpfjit_execute_code(pkt, 8, 8, code) == 0);
 
 		bpfjit_free_code(code);
 	}
