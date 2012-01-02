@@ -510,6 +510,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	int status;
 	int width;
 	unsigned int rval, mode, src;
+	size_t locals_size;
 	int minm, maxm; /* min/max k for M[k] */
 	unsigned int opts;
 	struct sljit_compiler* compiler;
@@ -542,6 +543,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	opts = bpfjit_optimization_hints(insns, insn_count);
 	minm = opts & 0xff;
 	maxm = (opts >> 8) & 0xff;
+	locals_size = (minm <= maxm) ? (maxm - minm + 1) * sizeof(sljit_uw) : 0;
 
 	jumps = calloc(insn_count, sizeof(jumps[0]));
 	if (jumps == NULL)
@@ -575,10 +577,18 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	sljit_compiler_verbose(compiler, stderr);
 #endif
 
-	status = sljit_emit_enter(compiler, 3, 4, 3,
-	    (minm > maxm ? 0 : maxm - minm + 1) * sizeof(uint32_t));
+	status = sljit_emit_enter(compiler, 3, 4, 3, locals_size);
 	if (status != SLJIT_SUCCESS)
 		goto fail;
+
+	for (i = 0; i < locals_size; i+= sizeof(sljit_uw)) {
+		status = sljit_emit_op1(compiler,
+		    SLJIT_MOV,
+		    SLJIT_MEM1(SLJIT_LOCALS_REG), i,
+		    SLJIT_IMM, 0);
+		if (status != SLJIT_SUCCESS)
+			goto fail;
+	}
 
 	if (opts & BPFJIT_INIT_A) {
 		/* A = 0; */
@@ -642,8 +652,17 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 
 			/* BPF_LD+BPF_MEM          A <- M[k] */
 			if (pc->code == (BPF_LD|BPF_MEM)) {
-				/* XXX implement */
-				goto fail;
+				if (pc->k >= BPF_MEMWORDS)
+					goto fail;
+				status = sljit_emit_op1(compiler,
+				    SLJIT_MOV,
+				    BPFJIT_A, 0,
+				    SLJIT_MEM1(SLJIT_LOCALS_REG),
+				    pc->k * sizeof(sljit_uw));
+				if (status != SLJIT_SUCCESS)
+					goto fail;
+
+				continue;
 			}
 
 			/* BPF_LD+BPF_W+BPF_LEN    A <- len */
@@ -784,12 +803,56 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				continue;
 			}
 
+			/* BPF_LDX+BPF_W+BPF_MEM    X <- M[k] */
+			if (mode == BPF_MEM) {
+				if (BPF_SIZE(pc->code) != BPF_W)
+					goto fail;
+				if (pc->k >= BPF_MEMWORDS)
+					goto fail;
+				status = sljit_emit_op1(compiler,
+				    SLJIT_MOV,
+				    BPFJIT_X, 0,
+				    SLJIT_MEM1(SLJIT_LOCALS_REG),
+				    pc->k * sizeof(sljit_uw));
+				if (status != SLJIT_SUCCESS)
+					goto fail;
+
+				continue;
+			}
+
 			/*
 			 * XXX implement
-			 * BPF_LDX+BPF_W+BPF_MEM    X <- M[k]
 			 * BPF_LDX+BPF_B+BPF_MSH    X <- 4*(P[k:1]&0xf)
 			 */
 			goto fail;
+
+		case BPF_ST:
+			if (pc->code != BPF_ST || pc->k >= BPF_MEMWORDS)
+				goto fail;
+
+			status = sljit_emit_op1(compiler,
+			    SLJIT_MOV,
+			    SLJIT_MEM1(SLJIT_LOCALS_REG),
+			    pc->k * sizeof(sljit_uw),
+			    BPFJIT_A, 0);
+			if (status != SLJIT_SUCCESS)
+				goto fail;
+
+			continue;
+
+		case BPF_STX:
+			if (pc->code != BPF_STX || pc->k >= BPF_MEMWORDS)
+				goto fail;
+
+			status = sljit_emit_op1(compiler,
+			    SLJIT_MOV,
+			    SLJIT_MEM1(SLJIT_LOCALS_REG),
+			    pc->k * sizeof(sljit_uw),
+			    BPFJIT_X, 0);
+			if (status != SLJIT_SUCCESS)
+				goto fail;
+
+			continue;
 
 		case BPF_ALU:
 
