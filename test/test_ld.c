@@ -68,7 +68,7 @@ test_ld_abs(void)
 	for (i = 0; i < 3; i++) {
 		void *code;
 
-		REQUIRE(bpf_validate(insns[i], insn_count));
+		CHECK(bpf_validate(insns[i], insn_count));
 
 		code = bpfjit_generate_code(insns[i], insn_count);
 		REQUIRE(code != NULL);
@@ -127,7 +127,7 @@ test_ld_abs_overflow(void)
 	for (i = 0; i < 3; i++) {
 		void *code;
 
-		REQUIRE(bpf_validate(insns[i], insn_count));
+		CHECK(bpf_validate(insns[i], insn_count));
 
 		code = bpfjit_generate_code(insns[i], insn_count);
 		REQUIRE(code != NULL);
@@ -171,7 +171,7 @@ test_ld_ind(void)
 	for (i = 0; i < 3; i++) {
 		void *code;
 
-		REQUIRE(bpf_validate(insns[i], insn_count));
+		CHECK(bpf_validate(insns[i], insn_count));
 
 		code = bpfjit_generate_code(insns[i], insn_count);
 		REQUIRE(code != NULL);
@@ -230,7 +230,7 @@ test_ld_ind_overflow(void)
 	for (i = 0; i < 3; i++) {
 		void *code;
 
-		REQUIRE(bpf_validate(insns[i], insn_count));
+		CHECK(bpf_validate(insns[i], insn_count));
 
 		code = bpfjit_generate_code(insns[i], insn_count);
 		REQUIRE(code != NULL);
@@ -255,7 +255,7 @@ test_ld_len(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -279,7 +279,7 @@ test_ld_imm(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);

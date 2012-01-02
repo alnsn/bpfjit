@@ -48,7 +48,7 @@ test_alu_add_k(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -72,7 +72,7 @@ test_alu_sub_k(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -96,7 +96,7 @@ test_alu_mul_k(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -119,7 +119,7 @@ test_alu_div0_k(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	//CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -143,7 +143,7 @@ test_alu_div1_k(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -167,7 +167,7 @@ test_alu_div2_k(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -191,7 +191,7 @@ test_alu_div4_k(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -215,7 +215,7 @@ test_alu_div10_k(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -239,7 +239,7 @@ test_alu_div10000_k(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -263,7 +263,7 @@ test_alu_div7609801_k(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -287,7 +287,7 @@ test_alu_div2147483648_k(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -311,7 +311,7 @@ test_alu_and_k(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -335,7 +335,7 @@ test_alu_or_k(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -359,7 +359,7 @@ test_alu_lsh_k(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -383,7 +383,7 @@ test_alu_lsh0_k(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -408,7 +408,7 @@ test_alu_lsh32_k(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -433,7 +433,7 @@ test_alu_rsh_k(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -457,7 +457,7 @@ test_alu_rsh0_k(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -482,7 +482,7 @@ test_alu_rsh32_k(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -508,7 +508,7 @@ test_alu_add_x(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -533,7 +533,7 @@ test_alu_sub_x(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -558,7 +558,7 @@ test_alu_mul_x(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -582,7 +582,7 @@ test_alu_div0_x(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -607,7 +607,7 @@ test_alu_div1_x(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -632,7 +632,7 @@ test_alu_div2_x(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -657,7 +657,7 @@ test_alu_div4_x(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -682,7 +682,7 @@ test_alu_div10_x(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -707,7 +707,7 @@ test_alu_div10000_x(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -732,7 +732,7 @@ test_alu_div7609801_x(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -757,7 +757,7 @@ test_alu_div2147483648_x(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -782,7 +782,7 @@ test_alu_and_x(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -807,7 +807,7 @@ test_alu_or_x(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -832,7 +832,7 @@ test_alu_lsh_x(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -857,7 +857,7 @@ test_alu_rsh_x(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -881,7 +881,7 @@ test_alu_neg(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);

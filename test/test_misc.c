@@ -49,7 +49,7 @@ test_misc_tax(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -73,7 +73,7 @@ test_misc_txa(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);

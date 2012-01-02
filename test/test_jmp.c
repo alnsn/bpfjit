@@ -51,7 +51,7 @@ test_jmp_ja(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
@@ -88,7 +88,7 @@ test_jmp_gt_k(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	REQUIRE(bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
