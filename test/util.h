@@ -36,10 +36,11 @@
 extern int exit_status;
 
 #define REQUIRE(x) if (!(x)) { \
-		errx(EXIT_FAILURE, "%s:%u: %s", __FILE__, __LINE__, #x); }
+	errx(EXIT_FAILURE, "%s:%u (in %s): %s",  \
+	    __FILE__, __LINE__, __func__, #x); }
 
 #define CHECK(x) if (!(x)) { \
-		exit_status = EXIT_FAILURE; \
-		warnx("%s:%u: %s", __FILE__, __LINE__, #x); }
+	exit_status = EXIT_FAILURE; \
+	warnx("%s:%u (in %s): %s", __FILE__, __LINE__, __func__, #x); }
 
 #endif /* #ifndef BPFJIT_TESTS_TEST_H */
