@@ -509,7 +509,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	size_t i;
 	int status;
 	int width;
-	unsigned int rval, mode;
+	unsigned int rval, mode, src;
 	int minm, maxm; /* min/max k for M[k] */
 	unsigned int opts;
 	struct sljit_compiler* compiler;
@@ -817,27 +817,13 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			}
 
 			/* BPF_DIV */
-			switch (BPF_SRC(pc->code)) {
-			case BPF_K:
-				if (pc->k == 0) {
-					jump = sljit_emit_jump(compiler,
-					    SLJIT_JUMP);
-					if (jump == NULL)
-						goto fail;
-					ret0[ret0_size++] = jump;
 
-					continue;
-				}
+			src = BPF_SRC(pc->code);
+			if (src != BPF_X && src != BPF_K)
+				goto fail;
 
-				status = (pc->k & (pc->k - 1)) == 0 ?
-    				    emit_pow2_division(compiler, pc->k) :
-				    emit_division(compiler, SLJIT_IMM, pc->k);
-				if (status != SLJIT_SUCCESS)
-					goto fail;
-
-				continue;
-
-			case BPF_X:
+			/* division by zero? */
+			if (src == BPF_X) {
 				jump = sljit_emit_cmp(compiler,
 				    SLJIT_C_EQUAL,
 				    BPFJIT_X, 0, 
@@ -845,16 +831,26 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				if (jump == NULL)
 					goto fail;
 				ret0[ret0_size++] = jump;
-
-				status = emit_division(compiler,
-				    BPFJIT_X, 0);
-				if (status != SLJIT_SUCCESS)
+			} else if (pc->k == 0) {
+				jump = sljit_emit_jump(compiler, SLJIT_JUMP);
+				if (jump == NULL)
 					goto fail;
-
-				continue;
+				ret0[ret0_size++] = jump;
 			}
 
-			goto fail;
+			if (src == BPF_X) {
+				status = emit_division(compiler, BPFJIT_X, 0);
+				if (status != SLJIT_SUCCESS)
+					goto fail;
+			} else if (pc->k != 0) {
+				status = (pc->k & (pc->k - 1)) == 0 ?
+    				    emit_pow2_division(compiler, pc->k) :
+				    emit_division(compiler, SLJIT_IMM, pc->k);
+				if (status != SLJIT_SUCCESS)
+					goto fail;
+			}
+
+			continue;
 
 		case BPF_JMP:
 
