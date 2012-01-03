@@ -37,6 +37,7 @@ int main(void)
 	test_ldx();
 	test_misc();
 	test_alu();
+	test_st();
 
 	return exit_status;
 }
