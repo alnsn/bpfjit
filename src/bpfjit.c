@@ -247,7 +247,7 @@ emit_pow2_division(struct sljit_compiler* compiler, uint32_t k)
 
 	if (shift != 0) {
 		status = sljit_emit_op2(compiler,
-		    SLJIT_LSHR,
+		    SLJIT_LSHR|SLJIT_INT_OP,
 		    BPFJIT_A, 0,
 		    BPFJIT_A, 0,
 		    SLJIT_IMM, shift);
@@ -385,12 +385,12 @@ bpf_alu_to_sljit_op(struct bpf_insn *pc)
 {
 
 	switch (BPF_OP(pc->code)) {
-	case BPF_ADD: return SLJIT_INT_OP|SLJIT_ADD;
-	case BPF_SUB: return SLJIT_INT_OP|SLJIT_SUB;
-	case BPF_MUL: return SLJIT_INT_OP|SLJIT_MUL;
+	case BPF_ADD: return SLJIT_ADD;
+	case BPF_SUB: return SLJIT_SUB;
+	case BPF_MUL: return SLJIT_MUL;
 	case BPF_OR:  return SLJIT_OR;
 	case BPF_AND: return SLJIT_AND;
-	case BPF_LSH: return SLJIT_INT_OP|SLJIT_SHL;
+	case BPF_LSH: return SLJIT_SHL;
 	case BPF_RSH: return SLJIT_INT_OP|SLJIT_LSHR;
 	default:
 		assert(false);
@@ -1138,8 +1138,8 @@ bpfjit_execute_code(const uint8_t *p, size_t wirelen,
 		    sljit_uw wirelen, sljit_uw buflen);
 	} func = { code };
 
-	/* XXX sljit_uw != unsigned int */
-	return func.func(p, wirelen, buflen);
+	/* Explicit cast to discard high bits on 64bit arches */
+	return (uint32_t)func.func(p, wirelen, buflen);
 }
 
 void
