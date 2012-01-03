@@ -1,3 +1,5 @@
 sljit/**/*.h
 sljit/**/*.c
+sljit/**/.svn
+sljit/.svn
 sljit/README
