@@ -1,7 +1,7 @@
 Just-in-Time Compilation for Berkeley Packet Filter
 ===================================================
 
-PREREQUISITES
+Prerequisites
 -------------
 
 You need sljit (http://sljit.sourceforge.net/) and mk-configure
@@ -16,7 +16,7 @@ The sljit code must be at revision r143 or newer.
 
 	$ tar cf sljit-r143.tar.gz sljit
 
-BUILDING
+Building
 --------
 
 Extract sljit tarball to sljit/ subdirectory. Make sure you pass
@@ -36,7 +36,7 @@ and install:
 
 	$ env PREFIX=/ mkcmake install
 
-TESTING
+Testing
 -------
 
 	$ export LD_LIBRARY_PATH=${DESTDIR}/lib
