@@ -256,12 +256,14 @@ emit_pow2_division(struct sljit_compiler* compiler, uint32_t k)
 	return status;
 }
 
+#if !defined(BPFJIT_USE_UDIV)
 static uint32_t
 divide(uint32_t x, uint32_t y)
 {
 
 	return x / y;
 }
+#endif
 
 /*
  * Generate A = A / div.
@@ -296,6 +298,18 @@ emit_division(struct sljit_compiler* compiler, int divt, sljit_w divw)
 	if (status != SLJIT_SUCCESS)
 		return status;
 
+#if defined(BPFJIT_USE_UDIV)
+	status = sljit_emit_op0(compiler, SLJIT_UDIV);
+
+#if BPFJIT_A != SLJIT_TEMPORARY_REG1
+	status = sljit_emit_op1(compiler,
+	    SLJIT_MOV,
+	    BPFJIT_A, 0,
+	    SLJIT_TEMPORARY_REG1, 0);
+	if (status != SLJIT_SUCCESS)
+		return status;
+#endif
+#else
 	status = sljit_emit_ijump(compiler,
 	    SLJIT_CALL2,
 	    SLJIT_IMM, SLJIT_FUNC_OFFSET(divide));
@@ -307,6 +321,7 @@ emit_division(struct sljit_compiler* compiler, int divt, sljit_w divw)
 	    SLJIT_RETURN_REG, 0);
 	if (status != SLJIT_SUCCESS)
 		return status;
+#endif
 #endif
 
 	return status;
