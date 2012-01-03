@@ -299,7 +299,7 @@ emit_division(struct sljit_compiler* compiler, int divt, sljit_w divw)
 		return status;
 
 #if defined(BPFJIT_USE_UDIV)
-	status = sljit_emit_op0(compiler, SLJIT_UDIV);
+	status = sljit_emit_op0(compiler, SLJIT_UDIV|SLJIT_INT_OP);
 
 #if BPFJIT_A != SLJIT_TEMPORARY_REG1
 	status = sljit_emit_op1(compiler,
