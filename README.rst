@@ -8,7 +8,7 @@ You need sljit (http://sljit.sourceforge.net/) and mk-configure
 (http://sourceforge.net/projects/mk-configure/) to build bpfjit.
 
 It is recommended to use pkgsrc and install devel/mk-configure.
-The pkgsrc guide is available here http://www.netbsd.org/docs/pkgsrc/
+The pkgsrc guide is available at http://www.netbsd.org/docs/pkgsrc/.
 
 The sljit code must be at revision r143 or newer.
 
