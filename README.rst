@@ -14,7 +14,7 @@ The sljit code must be at revision r143 or newer.
 
 	$ svn co https://sljit.svn.sourceforge.net/svnroot/sljit@r143 sljit
 
-	$ tar cf sljit-r143.tar.gz sljit
+	$ tar cf sljit-r143.tar.gz sljit/
 
 Building
 --------
