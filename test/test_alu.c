@@ -86,7 +86,7 @@ static void
 test_alu_mul_k(void)
 {
 	static struct bpf_insn insns[] = {
-		BPF_STMT(BPF_LD+BPF_IMM, UINT32_MAX),
+		BPF_STMT(BPF_LD+BPF_IMM, UINT32_C(0xffffffff)),
 		BPF_STMT(BPF_ALU+BPF_MUL+BPF_K, 3),
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
@@ -101,7 +101,7 @@ test_alu_mul_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_MAX * UINT32_C(3));
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_C(0xfffffffd));
 
 	bpfjit_free_code(code);
 }
@@ -181,7 +181,7 @@ static void
 test_alu_div4_k(void)
 {
 	static struct bpf_insn insns[] = {
-		BPF_STMT(BPF_LD+BPF_IMM, UINT32_MAX),
+		BPF_STMT(BPF_LD+BPF_IMM, UINT32_C(0xffffffff)),
 		BPF_STMT(BPF_ALU+BPF_DIV+BPF_K, 4),
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
@@ -196,7 +196,7 @@ test_alu_div4_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == (UINT32_MAX/4u));
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_C(0x3fffffff));
 
 	bpfjit_free_code(code);
 }
@@ -274,11 +274,11 @@ test_alu_div7609801_k(void)
 }
 
 static void
-test_alu_div2147483648_k(void)
+test_alu_div0x80000000_k(void)
 {
 	static struct bpf_insn insns[] = {
-		BPF_STMT(BPF_LD+BPF_IMM, UINT32_MAX - 33),
-		BPF_STMT(BPF_ALU+BPF_DIV+BPF_K, UINT32_C(2147483648)),
+		BPF_STMT(BPF_LD+BPF_IMM, UINT32_C(0xffffffde)),
+		BPF_STMT(BPF_ALU+BPF_DIV+BPF_K, UINT32_C(0x80000000)),
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
@@ -547,7 +547,7 @@ static void
 test_alu_mul_x(void)
 {
 	static struct bpf_insn insns[] = {
-		BPF_STMT(BPF_LD+BPF_IMM, UINT32_MAX),
+		BPF_STMT(BPF_LD+BPF_IMM, UINT32_C(0xffffffff)),
 		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 3),
 		BPF_STMT(BPF_ALU+BPF_MUL+BPF_X, 0),
 		BPF_STMT(BPF_RET+BPF_A, 0)
@@ -563,7 +563,7 @@ test_alu_mul_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_MAX * UINT32_C(3));
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_C(0xfffffffd));
 
 	bpfjit_free_code(code);
 }
@@ -646,7 +646,7 @@ static void
 test_alu_div4_x(void)
 {
 	static struct bpf_insn insns[] = {
-		BPF_STMT(BPF_LD+BPF_IMM, UINT32_MAX),
+		BPF_STMT(BPF_LD+BPF_IMM, UINT32_C(0xffffffff)),
 		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 4),
 		BPF_STMT(BPF_ALU+BPF_DIV+BPF_X, 0),
 		BPF_STMT(BPF_RET+BPF_A, 0)
@@ -662,7 +662,7 @@ test_alu_div4_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == (UINT32_MAX/4u));
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_C(0x3fffffff));
 
 	bpfjit_free_code(code);
 }
@@ -743,11 +743,11 @@ test_alu_div7609801_x(void)
 }
 
 static void
-test_alu_div2147483648_x(void)
+test_alu_div0x80000000_x(void)
 {
 	static struct bpf_insn insns[] = {
 		BPF_STMT(BPF_LD+BPF_IMM, UINT32_MAX - 33),
-		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, UINT32_C(2147483648)),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, UINT32_C(0x80000000)),
 		BPF_STMT(BPF_ALU+BPF_DIV+BPF_X, 0),
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
@@ -905,7 +905,7 @@ test_alu(void)
 	test_alu_div10_k();
 	test_alu_div10000_k();
 	test_alu_div7609801_k();
-	test_alu_div2147483648_k();
+	test_alu_div0x80000000_k();
 	test_alu_and_k();
 	test_alu_or_k();
 	test_alu_lsh_k();
@@ -925,7 +925,7 @@ test_alu(void)
 	test_alu_div10_x();
 	test_alu_div10000_x();
 	test_alu_div7609801_x();
-	test_alu_div2147483648_x();
+	test_alu_div0x80000000_x();
 	test_alu_and_x();
 	test_alu_or_x();
 	test_alu_lsh_x();
