@@ -391,7 +391,7 @@ bpf_alu_to_sljit_op(struct bpf_insn *pc)
 	case BPF_OR:  return SLJIT_OR;
 	case BPF_AND: return SLJIT_AND;
 	case BPF_LSH: return SLJIT_SHL;
-	case BPF_RSH: return SLJIT_INT_OP|SLJIT_LSHR;
+	case BPF_RSH: return SLJIT_LSHR|SLJIT_INT_OP;
 	default:
 		assert(false);
 	}
@@ -1131,8 +1131,7 @@ unsigned int
 bpfjit_execute_code(const uint8_t *p, size_t wirelen,
     size_t buflen, const void *code)
 {
-	union
-	{
+	union {
 		const void* code;
 		sljit_uw (SLJIT_CALL *func)(const uint8_t *p,
 		    sljit_uw wirelen, sljit_uw buflen);
