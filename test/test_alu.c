@@ -494,6 +494,64 @@ test_alu_rsh32_k(void)
 }
 
 static void
+test_alu_modulo_k(void)
+{
+	static struct bpf_insn insns[] = {
+		BPF_STMT(BPF_LD+BPF_IMM, UINT32_C(0x7fffff77)),
+
+		/* (7FFFFF77 * 0FFFFF77) = 07FFFFB2,F0004951 */
+		BPF_STMT(BPF_ALU+BPF_MUL+BPF_K, UINT32_C(0x0fffff77)),
+
+		/* 07FFFFB2,F0004951 << 1 = 0FFFFF65,E00092A2 */
+		BPF_STMT(BPF_ALU+BPF_LSH+BPF_K, 1),
+
+		/* 0FFFFF65,E00092A2 + DDDDDDDD = 0FFFFF66,BDDE707F */
+		BPF_STMT(BPF_ALU+BPF_ADD+BPF_K, UINT32_C(0xdddddddd)),
+
+		/* 0FFFFF66,BDDE707F - FFFFFFFF = 0FFFFF65,BDDE7080 */
+		BPF_STMT(BPF_ALU+BPF_SUB+BPF_K, UINT32_C(0xffffffff)),
+
+		/* 0FFFFF65,BDDE7080 | 0000030C = 0FFFFF65,BDDE738C */
+		BPF_STMT(BPF_ALU+BPF_OR+BPF_K, UINT32_C(0x0000030c)),
+
+		/* -0FFFFF65,BDDE738C mod(2^64) = F000009A,42218C74 */
+		BPF_STMT(BPF_ALU+BPF_NEG, 0),
+
+		/* F000009A,42218C74 & FFFFFF0F = F000009A,42218C04 */
+		BPF_STMT(BPF_ALU+BPF_AND+BPF_K, UINT32_C(0xffffff0f)),
+
+		/* F000009A,42218C74 >> 3 = 1E000013,48443180 */
+		/* 00000000,42218C74 >> 3 = 00000000,08443180 */
+		BPF_STMT(BPF_ALU+BPF_RSH+BPF_K, 3),
+
+		/* 00000000,08443180 * 7FFFFF77 = 042218BB,93818280 */
+		BPF_STMT(BPF_ALU+BPF_MUL+BPF_K, UINT32_C(0x7fffff77)),
+
+		/* 042218BB,93818280 / DEAD = 000004C0,71CBBBC3 */
+		/* 00000000,93818280 / DEAD = 00000000,0000A994 */
+		BPF_STMT(BPF_ALU+BPF_DIV+BPF_K, UINT32_C(0xdead)),
+
+		BPF_STMT(BPF_RET+BPF_A, 0)
+	};
+
+	void *code;
+	uint8_t pkt[1]; /* the program doesn't read any data */
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	CHECK(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) != UINT32_C(0x71cbbbc3));
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_C(0x0000a994));
+
+
+	bpfjit_free_code(code);
+}
+
+static void
 test_alu_add_x(void)
 {
 	static struct bpf_insn insns[] = {
@@ -914,6 +972,7 @@ test_alu(void)
 	test_alu_rsh_k();
 	test_alu_rsh0_k();
 	test_alu_rsh32_k();
+	test_alu_modulo_k();
 
 	test_alu_add_x();
 	test_alu_sub_x();
