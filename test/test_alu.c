@@ -388,8 +388,7 @@ test_alu_lsh0_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) ==
-	    bpf_filter(insns, pkt, 1, 1));
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0xdeadbeef);
 
 	bpfjit_free_code(code);
 }
@@ -437,8 +436,7 @@ test_alu_rsh0_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) ==
-	    bpf_filter(insns, pkt, 1, 1));
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0xdeadbeef);
 
 	bpfjit_free_code(code);
 }
@@ -851,6 +849,31 @@ test_alu_lsh_x(void)
 }
 
 static void
+test_alu_lsh0_x(void)
+{
+	static struct bpf_insn insns[] = {
+		BPF_STMT(BPF_LD+BPF_IMM, 0xdeadbeef),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 0),
+		BPF_STMT(BPF_ALU+BPF_LSH+BPF_X, 0),
+		BPF_STMT(BPF_RET+BPF_A, 0)
+	};
+
+	void *code;
+	uint8_t pkt[1]; /* the program doesn't read any data */
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	CHECK(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0xdeadbeef);
+
+	bpfjit_free_code(code);
+}
+
+static void
 test_alu_rsh_x(void)
 {
 	static struct bpf_insn insns[] = {
@@ -871,6 +894,31 @@ test_alu_rsh_x(void)
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0x0000dead);
+
+	bpfjit_free_code(code);
+}
+
+static void
+test_alu_rsh0_x(void)
+{
+	static struct bpf_insn insns[] = {
+		BPF_STMT(BPF_LD+BPF_IMM, 0xdeadbeef),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 0),
+		BPF_STMT(BPF_ALU+BPF_RSH+BPF_X, 0),
+		BPF_STMT(BPF_RET+BPF_A, 0)
+	};
+
+	void *code;
+	uint8_t pkt[1]; /* the program doesn't read any data */
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	CHECK(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0xdeadbeef);
 
 	bpfjit_free_code(code);
 }
@@ -936,7 +984,9 @@ test_alu(void)
 	test_alu_and_x();
 	test_alu_or_x();
 	test_alu_lsh_x();
+	test_alu_lsh0_x();
 	test_alu_rsh_x();
+	test_alu_rsh0_x();
 
 	test_alu_neg();
 }
