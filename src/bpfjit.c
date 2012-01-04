@@ -403,14 +403,23 @@ bpf_alu_to_sljit_op(struct bpf_insn *pc)
 static int
 bpf_jmp_to_sljit_cond(struct bpf_insn *pc, bool negate)
 {
+	int rv = SLJIT_INT_OP;
 
 	switch (BPF_OP(pc->code)) {
-	case BPF_JGT: return negate ? SLJIT_C_LESS_EQUAL : SLJIT_C_GREATER;
-	case BPF_JGE: return negate ? SLJIT_C_LESS : SLJIT_C_GREATER_EQUAL;
-	case BPF_JEQ: return negate ? SLJIT_C_NOT_EQUAL : SLJIT_C_EQUAL;
+	case BPF_JGT:
+		rv |= negate ? SLJIT_C_LESS_EQUAL : SLJIT_C_GREATER;
+		break;
+	case BPF_JGE:
+		rv |= negate ? SLJIT_C_LESS : SLJIT_C_GREATER_EQUAL;
+		break;
+	case BPF_JEQ:
+		rv |= negate ? SLJIT_C_NOT_EQUAL : SLJIT_C_EQUAL;
+		break;
 	default:
 		assert(false);
 	}
+
+	return rv;
 }
 
 static unsigned int
@@ -903,7 +912,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			/* division by zero? */
 			if (src == BPF_X) {
 				jump = sljit_emit_cmp(compiler,
-				    SLJIT_C_EQUAL,
+				    SLJIT_C_EQUAL|SLJIT_INT_OP,
 				    BPFJIT_X, 0, 
 				    SLJIT_IMM, 0);
 				if (jump == NULL)
