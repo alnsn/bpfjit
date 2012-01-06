@@ -972,8 +972,8 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 
 				bjump->bj_jump = sljit_emit_cmp(compiler,
 				    bpf_jmp_to_sljit_cond(pc, negate),
-				    kx_to_reg(pc), kx_to_reg_arg(pc),
-				    BPFJIT_A, 0);
+				    BPFJIT_A, 0,
+				    kx_to_reg(pc), kx_to_reg_arg(pc));
 
 				SLIST_INSERT_HEAD(&jumps[jm + (i + 1)],
 				    bjump, bj_entries);
