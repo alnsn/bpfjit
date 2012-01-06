@@ -35,6 +35,7 @@ int main(void)
 	test_empty();
 	test_ld();
 	test_ldx();
+	test_jmp();
 	test_misc();
 	test_alu();
 	test_st();
