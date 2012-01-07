@@ -533,7 +533,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	size_t i;
 	int status;
 	int width;
-	unsigned int rval, mode, src;
+	unsigned int rval, mode, op, src;
 	size_t locals_size;
 	int minm, maxm; /* min/max k for M[k] */
 	unsigned int opts;
@@ -891,7 +891,16 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				continue;
 			}
 
-			if (BPF_OP(pc->code) != BPF_DIV) {
+			op = BPF_OP(pc->code);
+			src = BPF_SRC(pc->code);
+
+			/* shifts by zero are nops */
+			if (src == BPF_K && pc->k == 0 &&
+			    (op == BPF_LSH || op == BPF_RSH)) {
+				continue;
+			}
+
+			if (op != BPF_DIV) {
 				status = sljit_emit_op2(compiler,
 				    bpf_alu_to_sljit_op(pc),
 				    BPFJIT_A, 0,
@@ -905,7 +914,6 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 
 			/* BPF_DIV */
 
-			src = BPF_SRC(pc->code);
 			if (src != BPF_X && src != BPF_K)
 				goto fail;
 
