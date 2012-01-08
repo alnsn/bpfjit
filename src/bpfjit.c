@@ -414,10 +414,14 @@ static int
 bpf_alu_to_sljit_op(struct bpf_insn *pc)
 {
 
+	/*
+	 * Note: all CPUs have 32bit multiply instruction so SLJIT_INT_OP
+	 * doesn't have any overhead.
+	 */
 	switch (BPF_OP(pc->code)) {
 	case BPF_ADD: return SLJIT_ADD;
 	case BPF_SUB: return SLJIT_SUB;
-	case BPF_MUL: return SLJIT_MUL;
+	case BPF_MUL: return SLJIT_MUL|SLJIT_INT_OP;
 	case BPF_OR:  return SLJIT_OR;
 	case BPF_AND: return SLJIT_AND;
 	case BPF_LSH: return SLJIT_SHL;
@@ -433,6 +437,10 @@ bpf_alu_to_sljit_op(struct bpf_insn *pc)
 static int
 bpf_jmp_to_sljit_cond(struct bpf_insn *pc, bool negate)
 {
+	/*
+	 * Note: all CPUs have 32bit comparison instructions so SLJIT_INT_OP
+	 * doesn't have any overhead.
+	 */
 	int rv = SLJIT_INT_OP;
 
 	switch (BPF_OP(pc->code)) {
