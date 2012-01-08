@@ -415,8 +415,8 @@ bpf_alu_to_sljit_op(struct bpf_insn *pc)
 {
 
 	/*
-	 * Note: all CPUs have 32bit multiply instruction so SLJIT_INT_OP
-	 * doesn't have any overhead.
+	 * Note: all supported 64bit arches have 32bit multiply
+	 * instruction so SLJIT_INT_OP oesn't have any overhead.
 	 */
 	switch (BPF_OP(pc->code)) {
 	case BPF_ADD: return SLJIT_ADD;
@@ -432,14 +432,14 @@ bpf_alu_to_sljit_op(struct bpf_insn *pc)
 }
 
 /*
- * Convert BPF_JMP operations except BPF_JA and BPF_JSET to sljit condition.
+ * Convert BPF_JMP operations except BPF_JA to sljit condition.
  */
 static int
 bpf_jmp_to_sljit_cond(struct bpf_insn *pc, bool negate)
 {
 	/*
-	 * Note: all CPUs have 32bit comparison instructions so SLJIT_INT_OP
-	 * doesn't have any overhead.
+	 * Note: all supported 64bit arches have 32bit comparison
+	 * instructions so SLJIT_INT_OP doesn't have any overhead.
 	 */
 	int rv = SLJIT_INT_OP;
 
@@ -452,6 +452,9 @@ bpf_jmp_to_sljit_cond(struct bpf_insn *pc, bool negate)
 		break;
 	case BPF_JEQ:
 		rv |= negate ? SLJIT_C_NOT_EQUAL : SLJIT_C_EQUAL;
+		break;
+	case BPF_JSET:
+		rv |= negate ? SLJIT_C_EQUAL : SLJIT_C_NOT_EQUAL;
 		break;
 	default:
 		assert(false);
@@ -1010,25 +1013,36 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				bool negate;
 				unsigned int jm;
 
-				bjump = malloc(sizeof(struct bpfjit_jump));
-				if (bjump == NULL)
-					goto fail;
-
 				negate = (pc->jt == 0);
 				jm = negate ? pc->jf : pc->jt;
 				if (jm >= insn_count - (i + 1))
 					goto fail;
 
-				/*
-				 * XXX implement BPF_JSET
-				 * BPF_JMP+BPF_JSET+BPF_K   pc += (A & k) ? jt : jf
-				 * BPF_JMP+BPF_JSET+BPF_X   pc += (A & X) ? jt : jf
-				 */
+				bjump = malloc(sizeof(struct bpfjit_jump));
+				if (bjump == NULL)
+					goto fail;
 
-				bjump->bj_jump = sljit_emit_cmp(compiler,
-				    bpf_jmp_to_sljit_cond(pc, negate),
-				    BPFJIT_A, 0,
-				    kx_to_reg(pc), kx_to_reg_arg(pc));
+				if (BPF_OP(pc->code) == BPF_JSET) {
+					status = sljit_emit_op2(compiler,
+					    SLJIT_AND,
+					    BPFJIT_TMP1, 0,
+					    BPFJIT_A, 0,
+					    kx_to_reg(pc), kx_to_reg_arg(pc));
+					if (status != SLJIT_SUCCESS) {
+						free(bjump);
+						goto fail;
+					}
+
+					bjump->bj_jump = sljit_emit_cmp(compiler,
+					    bpf_jmp_to_sljit_cond(pc, negate),
+					    BPFJIT_TMP1, 0,
+					    SLJIT_IMM, 0);
+				} else {
+					bjump->bj_jump = sljit_emit_cmp(compiler,
+					    bpf_jmp_to_sljit_cond(pc, negate),
+					    BPFJIT_A, 0,
+					    kx_to_reg(pc), kx_to_reg_arg(pc));
+				}
 
 				SLIST_INSERT_HEAD(&jumps[jm + (i + 1)],
 				    bjump, bj_entries);
