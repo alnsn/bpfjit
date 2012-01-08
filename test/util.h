@@ -36,7 +36,7 @@
 extern int exit_status;
 
 #define REQUIRE(x) if (!(x)) { \
-	errx(EXIT_FAILURE, "%s:%u (in %s): %s",  \
+	errx(EXIT_FAILURE, "%s:%u (in %s): %s\nAborted",  \
 	    __FILE__, __LINE__, __func__, #x); }
 
 #define CHECK(x) if (!(x)) { \
