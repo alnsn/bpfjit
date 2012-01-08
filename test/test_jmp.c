@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2011 Alexander Nasonov.
+ * Copyright (c) 2011-2012 Alexander Nasonov.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -196,6 +196,161 @@ test_jmp_eq_k(void)
 	bpfjit_free_code(code);
 }
 
+static void
+test_jmp_gt_x(void)
+{
+	static struct bpf_insn insns[] = {
+		BPF_STMT(BPF_LD+BPF_W+BPF_LEN, 0),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 7),
+		BPF_JUMP(BPF_JMP+BPF_JGT+BPF_X, 0, 0, 1),
+		BPF_STMT(BPF_RET+BPF_K, 0),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 2),
+		BPF_JUMP(BPF_JMP+BPF_JGT+BPF_X, 0, 3, 0),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 9),
+		BPF_JUMP(BPF_JMP+BPF_JGT+BPF_X, 0, 0, 0),
+		BPF_STMT(BPF_RET+BPF_K, 1),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 4),
+		BPF_JUMP(BPF_JMP+BPF_JGT+BPF_X, 0, 1, 1),
+		BPF_STMT(BPF_RET+BPF_K, 2),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 6),
+		BPF_JUMP(BPF_JMP+BPF_JGT+BPF_X, 0, 2, 3),
+		BPF_STMT(BPF_RET+BPF_K, 3),
+		BPF_STMT(BPF_RET+BPF_K, 4),
+		BPF_STMT(BPF_RET+BPF_K, 5),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 5),
+		BPF_JUMP(BPF_JMP+BPF_JGT+BPF_X, 0, 4, 1),
+		BPF_STMT(BPF_RET+BPF_K, 6),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 0),
+		BPF_JUMP(BPF_JMP+BPF_JGT+BPF_X, 0, 0, 0),
+		BPF_STMT(BPF_RET+BPF_K, 7),
+		BPF_STMT(BPF_RET+BPF_K, 8)
+	};
+
+	void *code;
+	uint8_t pkt[8]; /* the program doesn't read any data */
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	CHECK(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 1);
+	CHECK(bpfjit_execute_code(pkt, 2, 2, code) == 1);
+	CHECK(bpfjit_execute_code(pkt, 3, 3, code) == 7);
+	CHECK(bpfjit_execute_code(pkt, 4, 4, code) == 7);
+	CHECK(bpfjit_execute_code(pkt, 5, 5, code) == 7);
+	CHECK(bpfjit_execute_code(pkt, 6, 6, code) == 8);
+	CHECK(bpfjit_execute_code(pkt, 7, 7, code) == 5);
+	CHECK(bpfjit_execute_code(pkt, 8, 8, code) == 0);
+
+	bpfjit_free_code(code);
+}
+
+static void
+test_jmp_ge_x(void)
+{
+	static struct bpf_insn insns[] = {
+		BPF_STMT(BPF_LD+BPF_W+BPF_LEN, 0),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 8),
+		BPF_JUMP(BPF_JMP+BPF_JGE+BPF_X, 0, 0, 1),
+		BPF_STMT(BPF_RET+BPF_K, 0),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 3),
+		BPF_JUMP(BPF_JMP+BPF_JGE+BPF_X, 0, 3, 0),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 9),
+		BPF_JUMP(BPF_JMP+BPF_JGE+BPF_X, 0, 0, 0),
+		BPF_STMT(BPF_RET+BPF_K, 1),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 5),
+		BPF_JUMP(BPF_JMP+BPF_JGE+BPF_X, 0, 1, 1),
+		BPF_STMT(BPF_RET+BPF_K, 2),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 7),
+		BPF_JUMP(BPF_JMP+BPF_JGE+BPF_X, 0, 2, 3),
+		BPF_STMT(BPF_RET+BPF_K, 3),
+		BPF_STMT(BPF_RET+BPF_K, 4),
+		BPF_STMT(BPF_RET+BPF_K, 5),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 6),
+		BPF_JUMP(BPF_JMP+BPF_JGE+BPF_X, 0, 4, 1),
+		BPF_STMT(BPF_RET+BPF_K, 6),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 1),
+		BPF_JUMP(BPF_JMP+BPF_JGE+BPF_X, 0, 0, 0),
+		BPF_STMT(BPF_RET+BPF_K, 7),
+		BPF_STMT(BPF_RET+BPF_K, 8)
+	};
+
+	void *code;
+	uint8_t pkt[8]; /* the program doesn't read any data */
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	CHECK(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 1);
+	CHECK(bpfjit_execute_code(pkt, 2, 2, code) == 1);
+	CHECK(bpfjit_execute_code(pkt, 3, 3, code) == 7);
+	CHECK(bpfjit_execute_code(pkt, 4, 4, code) == 7);
+	CHECK(bpfjit_execute_code(pkt, 5, 5, code) == 7);
+	CHECK(bpfjit_execute_code(pkt, 6, 6, code) == 8);
+	CHECK(bpfjit_execute_code(pkt, 7, 7, code) == 5);
+	CHECK(bpfjit_execute_code(pkt, 8, 8, code) == 0);
+
+	bpfjit_free_code(code);
+}
+
+static void
+test_jmp_eq_x(void)
+{
+	static struct bpf_insn insns[] = {
+		BPF_STMT(BPF_LD+BPF_W+BPF_LEN, 0),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 8),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_X, 0, 0, 1),
+		BPF_STMT(BPF_RET+BPF_K, 0),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 3),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_X, 0, 2, 0),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 9),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_X, 0, 1, 1),
+		BPF_STMT(BPF_RET+BPF_K, 1),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 5),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_X, 0, 1, 1),
+		BPF_STMT(BPF_RET+BPF_K, 2),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 7),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_X, 0, 2, 3),
+		BPF_STMT(BPF_RET+BPF_K, 3),
+		BPF_STMT(BPF_RET+BPF_K, 4),
+		BPF_STMT(BPF_RET+BPF_K, 5),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 6),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_X, 0, 3, 1),
+		BPF_STMT(BPF_RET+BPF_K, 6),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_X, 1, 0, 0),
+		BPF_STMT(BPF_RET+BPF_K, 7),
+		BPF_STMT(BPF_RET+BPF_K, 8)
+	};
+
+	void *code;
+	uint8_t pkt[8]; /* the program doesn't read any data */
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	CHECK(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 7);
+	CHECK(bpfjit_execute_code(pkt, 2, 2, code) == 7);
+	CHECK(bpfjit_execute_code(pkt, 3, 3, code) == 1);
+	CHECK(bpfjit_execute_code(pkt, 4, 4, code) == 7);
+	CHECK(bpfjit_execute_code(pkt, 5, 5, code) == 7);
+	CHECK(bpfjit_execute_code(pkt, 6, 6, code) == 8);
+	CHECK(bpfjit_execute_code(pkt, 7, 7, code) == 5);
+	CHECK(bpfjit_execute_code(pkt, 8, 8, code) == 0);
+
+	bpfjit_free_code(code);
+}
+
 void
 test_jmp(void)
 {
@@ -204,5 +359,8 @@ test_jmp(void)
 	test_jmp_gt_k();
 	test_jmp_ge_k();
 	test_jmp_eq_k();
+	test_jmp_gt_x();
+	test_jmp_ge_x();
+	test_jmp_eq_x();
 	/* XXX add test_jmp_*_modulo_[kx] tests */
 }
