@@ -139,6 +139,30 @@ test_ldx_len2(void)
 	bpfjit_free_code(code);
 }
 
+static void
+test_ldx_msh(void)
+{
+	static struct bpf_insn insns[] = {
+		BPF_STMT(BPF_LDX+BPF_B+BPF_MSH, 1),
+		BPF_STMT(BPF_ALU+BPF_ADD+BPF_X, 0),
+		BPF_STMT(BPF_RET+BPF_A, 0)
+	};
+
+	void *code;
+	uint8_t pkt[2] = { 0, 0x7a };
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	CHECK(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	CHECK(bpfjit_execute_code(pkt, 2, 2, code) == 40);
+
+	bpfjit_free_code(code);
+}
+
 void
 test_ldx(void)
 {
@@ -147,4 +171,5 @@ test_ldx(void)
 	test_ldx_imm2();
 	test_ldx_len1();
 	test_ldx_len2();
+	test_ldx_msh();
 }

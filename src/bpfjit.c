@@ -210,7 +210,7 @@ emit_read32(struct sljit_compiler* compiler, uint32_t k)
 	    SLJIT_ADD,
 	    BPFJIT_A, 0,
 	    BPFJIT_A, 0,
-		BPFJIT_TMP2, 0);
+	    BPFJIT_TMP2, 0);
 	if (status != SLJIT_SUCCESS)
 		return status;
 
@@ -228,8 +228,38 @@ emit_read32(struct sljit_compiler* compiler, uint32_t k)
 	    SLJIT_ADD,
 	    BPFJIT_A, 0,
 	    BPFJIT_A, 0,
-		BPFJIT_TMP1, 0);
+	    BPFJIT_TMP1, 0);
 	return status;
+}
+
+/*
+ * Generate code for BPF_LDX+BPF_B+BPF_MSH    X <- 4*(P[k:1]&0xf).
+ */
+static int
+emit_msh(struct sljit_compiler* compiler, uint32_t k)
+{
+	int status;
+
+	status = sljit_emit_op1(compiler,
+	    SLJIT_MOV_UB,
+	    BPFJIT_TMP1, 0,
+	    SLJIT_MEM1(BPFJIT_BUF), k);
+	if (status != SLJIT_SUCCESS)
+		return status;
+
+	status = sljit_emit_op2(compiler,
+	    SLJIT_AND,
+	    BPFJIT_TMP1, 0,
+	    BPFJIT_TMP1, 0,
+	    SLJIT_IMM, 0xf);
+	if (status != SLJIT_SUCCESS)
+		return status;
+
+	return sljit_emit_op2(compiler,
+	    SLJIT_SHL,
+	    BPFJIT_X, 0,
+	    BPFJIT_TMP1, 0,
+	    SLJIT_IMM, 2);
 }
 
 static int
@@ -844,10 +874,27 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				continue;
 			}
 
-			/*
-			 * XXX implement
-			 * BPF_LDX+BPF_B+BPF_MSH    X <- 4*(P[k:1]&0xf)
-			 */
+			/* BPF_LDX+BPF_B+BPF_MSH    X <- 4*(P[k:1]&0xf) */
+			if (mode == BPF_MSH) {
+				if (BPF_SIZE(pc->code) != BPF_B)
+					goto fail;
+
+				/* if (pc->k >= buflen) return 0; */
+				jump = sljit_emit_cmp(compiler,
+				    SLJIT_C_GREATER_EQUAL,
+				    SLJIT_IMM, pc->k,
+				    BPFJIT_BUFLEN, 0);
+				if (jump == NULL)
+					goto fail;
+				ret0[ret0_size++] = jump;
+			
+				status = emit_msh(compiler, pc->k);
+				if (status != SLJIT_SUCCESS)
+					goto fail;
+
+				continue;
+			}
+
 			goto fail;
 
 		case BPF_ST:
