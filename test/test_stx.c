@@ -89,15 +89,99 @@ test_stx2(void)
 	bpfjit_free_code(code);
 }
 
+static void
+test_stx3(void)
+{
+	static struct bpf_insn insns[] = {
+		BPF_STMT(BPF_LDX+BPF_W+BPF_LEN, 0),
+		BPF_STMT(BPF_STX, 5),
+		BPF_STMT(BPF_STX, 2),
+		BPF_STMT(BPF_STX, 3),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_MEM, 1),
+		BPF_STMT(BPF_ALU+BPF_ADD+BPF_X, 0),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_MEM, 2),
+		BPF_STMT(BPF_ALU+BPF_ADD+BPF_X, 0),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_MEM, 3),
+		BPF_STMT(BPF_ALU+BPF_ADD+BPF_X, 0),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_MEM, 5),
+		BPF_STMT(BPF_ALU+BPF_ADD+BPF_X, 0),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_MEM, 6),
+		BPF_STMT(BPF_ALU+BPF_ADD+BPF_X, 0),
+		BPF_STMT(BPF_RET+BPF_A, 0)
+	};
+
+	size_t i;
+	void *code;
+	uint8_t pkt[16]; /* the program doesn't read any data */
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	CHECK(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	for (i = 1; i <= sizeof(pkt); i++)
+		CHECK(bpfjit_execute_code(pkt, i, sizeof(pkt), code) == 3 * i);
+
+	bpfjit_free_code(code);
+}
+
+static void
+test_stx4(void)
+{
+	struct bpf_insn insns[5*BPF_MEMWORDS+2];
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	size_t k;
+	void *code;
+	uint8_t pkt[BPF_MEMWORDS]; /* the program doesn't read any data */
+
+	memset(insns, 0, sizeof(insns));
+
+	/* for each k do M[k] = k */
+	for (k = 0; k < BPF_MEMWORDS; k++) {
+		insns[2*k].code   = BPF_LDX+BPF_W+BPF_IMM;
+		insns[2*k].k      = 3*k;
+		insns[2*k+1].code = BPF_STX;
+		insns[2*k+1].k    = k;
+	}
+
+	/* load wirelen into A */
+	insns[2*BPF_MEMWORDS].code = BPF_LD+BPF_W+BPF_LEN;
+
+	/* for each k, if (A == k + 1) return M[k] */
+	for (k = 0; k < BPF_MEMWORDS; k++) {
+		insns[2*BPF_MEMWORDS+3*k+1].code = BPF_JMP+BPF_JEQ+BPF_K;
+		insns[2*BPF_MEMWORDS+3*k+1].k    = k+1;
+		insns[2*BPF_MEMWORDS+3*k+1].jt   = 0;
+		insns[2*BPF_MEMWORDS+3*k+1].jf   = 2;
+		insns[2*BPF_MEMWORDS+3*k+2].code = BPF_LD+BPF_MEM;
+		insns[2*BPF_MEMWORDS+3*k+2].k    = k;
+		insns[2*BPF_MEMWORDS+3*k+3].code = BPF_RET+BPF_A;
+		insns[2*BPF_MEMWORDS+3*k+3].k    = 0;
+	}
+
+	insns[5*BPF_MEMWORDS+1].code = BPF_RET+BPF_K;
+	insns[5*BPF_MEMWORDS+1].k    = UINT32_MAX;
+
+	CHECK(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	for (k = 1; k <= sizeof(pkt); k++)
+		CHECK(bpfjit_execute_code(pkt, k, k, code) == 3*(k-1));
+
+	bpfjit_free_code(code);
+}
+
 void
 test_stx(void)
 {
 
 	test_stx1();
 	test_stx2();
-	/* XXX
-	 * test_stx3();
-	 * test_stx4();
-	 * test_stx5();
-	 */
+	test_stx3();
+	test_stx4();
 }
