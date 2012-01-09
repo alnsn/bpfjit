@@ -39,6 +39,7 @@ int main(void)
 	test_misc();
 	test_alu();
 	test_st();
+	test_stx();
 
 	return exit_status;
 }
