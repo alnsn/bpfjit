@@ -197,6 +197,55 @@ test_jmp_eq_k(void)
 }
 
 static void
+test_jmp_modulo_k(void)
+{
+	static struct bpf_insn insns[] = {
+		BPF_STMT(BPF_LD+BPF_IMM, UINT32_C(0x7fffff77)),
+		BPF_STMT(BPF_ALU+BPF_LSH+BPF_K, 4),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, UINT32_C(0xfffff770), 1, 0),
+		BPF_STMT(BPF_RET+BPF_K, 0),
+		BPF_JUMP(BPF_JMP+BPF_JGT+BPF_K, UINT32_C(0xfffff770), 0, 1),
+		BPF_STMT(BPF_RET+BPF_K, 1),
+		BPF_JUMP(BPF_JMP+BPF_JGE+BPF_K, UINT32_C(0xfffff771), 0, 1),
+		BPF_STMT(BPF_RET+BPF_K, 2),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, UINT32_C(0xfffff770), 0, 3),
+		BPF_JUMP(BPF_JMP+BPF_JGT+BPF_K, UINT32_C(0xfffff770), 2, 0),
+		BPF_JUMP(BPF_JMP+BPF_JGE+BPF_K, UINT32_C(0xfffff771), 1, 0),
+		BPF_STMT(BPF_JMP+BPF_JA, 1),
+		BPF_STMT(BPF_RET+BPF_K, 3),
+
+		/* FFFFF770+FFFFF770 = 00000001,FFFFEEE0 */
+		BPF_STMT(BPF_ALU+BPF_ADD+BPF_K, UINT32_C(0xfffff770)),
+
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, UINT32_C(0xffffeee0), 1, 0),
+		BPF_STMT(BPF_RET+BPF_K, 4),
+		BPF_JUMP(BPF_JMP+BPF_JGT+BPF_K, UINT32_C(0xffffeee0), 0, 1),
+		BPF_STMT(BPF_RET+BPF_K, 5),
+		BPF_JUMP(BPF_JMP+BPF_JGE+BPF_K, UINT32_C(0xffffeee1), 0, 1),
+		BPF_STMT(BPF_RET+BPF_K, 6),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, UINT32_C(0xffffeee0), 0, 3),
+		BPF_JUMP(BPF_JMP+BPF_JGT+BPF_K, UINT32_C(0xffffeee0), 2, 0),
+		BPF_JUMP(BPF_JMP+BPF_JGE+BPF_K, UINT32_C(0xffffeee1), 1, 0),
+		BPF_STMT(BPF_RET+BPF_K, UINT32_MAX),
+		BPF_STMT(BPF_RET+BPF_K, 7)
+	};
+
+	void *code;
+	uint8_t pkt[1]; /* the program doesn't read any data */
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	CHECK(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_MAX);
+
+	bpfjit_free_code(code);
+}
+
+static void
 test_jmp_jset_k(void)
 {
 	static struct bpf_insn insns[] = {
@@ -447,6 +496,65 @@ test_jmp_jset_x(void)
 	bpfjit_free_code(code);
 }
 
+static void
+test_jmp_modulo_x(void)
+{
+	static struct bpf_insn insns[] = {
+		BPF_STMT(BPF_LD+BPF_IMM, UINT32_C(0x7fffff77)),
+		/* FFFFF770 << 4 = FFFFF770 */
+		BPF_STMT(BPF_ALU+BPF_LSH+BPF_K, 4),
+
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, UINT32_C(0xfffff770)),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_X, 0, 1, 0),
+		BPF_STMT(BPF_RET+BPF_K, 0),
+		BPF_JUMP(BPF_JMP+BPF_JGT+BPF_X, 0, 0, 1),
+		BPF_STMT(BPF_RET+BPF_K, 1),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, UINT32_C(0xfffff771)),
+		BPF_JUMP(BPF_JMP+BPF_JGE+BPF_X, 0, 0, 1),
+		BPF_STMT(BPF_RET+BPF_K, 2),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, UINT32_C(0xfffff770)),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_X, 0, 0, 4),
+		BPF_JUMP(BPF_JMP+BPF_JGT+BPF_X, 0, 3, 0),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, UINT32_C(0xfffff771)),
+		BPF_JUMP(BPF_JMP+BPF_JGE+BPF_X, 0, 1, 0),
+		BPF_STMT(BPF_JMP+BPF_JA, 1),
+		BPF_STMT(BPF_RET+BPF_K, 3),
+
+		/* FFFFF770+FFFFF770 = 00000001,FFFFEEE0 */
+		BPF_STMT(BPF_ALU+BPF_ADD+BPF_K, UINT32_C(0xfffff770)),
+
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, UINT32_C(0xffffeee0)),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_X, 0, 1, 0),
+		BPF_STMT(BPF_RET+BPF_K, 4),
+		BPF_JUMP(BPF_JMP+BPF_JGT+BPF_X, 0, 0, 1),
+		BPF_STMT(BPF_RET+BPF_K, 5),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, UINT32_C(0xffffeee1)),
+		BPF_JUMP(BPF_JMP+BPF_JGE+BPF_X, 0, 0, 1),
+		BPF_STMT(BPF_RET+BPF_K, 6),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, UINT32_C(0xffffeee0)),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_X, 0, 0, 4),
+		BPF_JUMP(BPF_JMP+BPF_JGT+BPF_X, 0, 3, 0),
+		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, UINT32_C(0xffffeee1)),
+		BPF_JUMP(BPF_JMP+BPF_JGE+BPF_X, 0, 1, 0),
+		BPF_STMT(BPF_RET+BPF_K, UINT32_MAX),
+		BPF_STMT(BPF_RET+BPF_K, 7)
+	};
+
+	void *code;
+	uint8_t pkt[1]; /* the program doesn't read any data */
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	CHECK(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_MAX);
+
+	bpfjit_free_code(code);
+}
+
 void
 test_jmp(void)
 {
@@ -456,9 +564,10 @@ test_jmp(void)
 	test_jmp_ge_k();
 	test_jmp_eq_k();
 	test_jmp_jset_k();
+	test_jmp_modulo_k();
 	test_jmp_gt_x();
 	test_jmp_ge_x();
 	test_jmp_eq_x();
 	test_jmp_jset_x();
-	/* XXX add test_jmp_*_modulo_[kx] tests */
+	test_jmp_modulo_x();
 }
