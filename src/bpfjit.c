@@ -1205,20 +1205,6 @@ fail:
 	return rv;
 }
 
-unsigned int
-bpfjit_execute_code(const uint8_t *p, size_t wirelen,
-    size_t buflen, const void *code)
-{
-	union {
-		const void* code;
-		sljit_uw (SLJIT_CALL *func)(const uint8_t *p,
-		    sljit_uw wirelen, sljit_uw buflen);
-	} func = { code };
-
-	/* Explicit cast to discard high bits on 64bit arches */
-	return (uint32_t)func.func(p, wirelen, buflen);
-}
-
 void
 bpfjit_free_code(void *code)
 {

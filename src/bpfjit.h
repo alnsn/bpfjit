@@ -40,11 +40,29 @@
 #include <net/bpf.h>
 #endif
 
+#include <sljitLir.h>
+
+#if defined(__GNUC)
+#define	bpfjit_unused	__attribute__((__unused__))
+#else
+#define	bpfjit_unused	/* delete */
+#endif
+
 void *bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count);
 void bpfjit_free_code(void *code);
 
-unsigned int
+static inline unsigned int bpfjit_unused
 bpfjit_execute_code(const uint8_t *p, size_t wirelen,
-    size_t buflen, const void *code);
+    size_t buflen, const void *code)
+{
+	union {
+		const void* code;
+		sljit_uw (SLJIT_CALL *func)(const uint8_t *p,
+		    sljit_uw wirelen, sljit_uw buflen);
+	} func = { code };
+
+	/* Explicit cast to discard high bits on 64bit arches */
+	return (uint32_t)func.func(p, wirelen, buflen);
+}
 
 #endif /* !_NET_BPFJIT_H_ */
