@@ -287,11 +287,11 @@ emit_pow2_division(struct sljit_compiler* compiler, uint32_t k)
 }
 
 #if !defined(BPFJIT_USE_UDIV)
-static uint32_t
-divide(uint32_t x, uint32_t y)
+static sljit_uw
+divide(sljit_uw x, sljit_uw y)
 {
 
-	return x / y;
+	return (uint32_t)x / (uint32_t)y;
 }
 #endif
 
@@ -416,7 +416,7 @@ bpf_alu_to_sljit_op(struct bpf_insn *pc)
 
 	/*
 	 * Note: all supported 64bit arches have 32bit multiply
-	 * instruction so SLJIT_INT_OP oesn't have any overhead.
+	 * instruction so SLJIT_INT_OP doesn't have any overhead.
 	 */
 	switch (BPF_OP(pc->code)) {
 	case BPF_ADD: return SLJIT_ADD;
@@ -766,6 +766,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				ret0[ret0_size++] = jump;
 
 				/* temporarily do buf += X; buflen -= X; */
+				/* XXX X can be greate than UINT32_MAX */
 				status = sljit_emit_op2(compiler,
 				    SLJIT_ADD,
 				    BPFJIT_BUF, 0,
