@@ -1119,7 +1119,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 
 			if (pc->code == (BPF_MISC|BPF_TAX)) {
 				status = sljit_emit_op1(compiler,
-				    SLJIT_MOV,
+				    SLJIT_MOV_UI,
 				    BPFJIT_X, 0,
 				    BPFJIT_A, 0);
 				if (status != SLJIT_SUCCESS)
