@@ -52,8 +52,8 @@ void *bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count);
 void bpfjit_free_code(void *code);
 
 static inline unsigned int bpfjit_unused
-bpfjit_execute_code(const uint8_t *p, size_t wirelen,
-    size_t buflen, const void *code)
+bpfjit_execute_code(const uint8_t *p, unsigned int wirelen,
+    unsigned int buflen, const void *code)
 {
 	union {
 		const void* code;
