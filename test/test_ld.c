@@ -90,7 +90,7 @@ test_ld_abs(void)
 }
 
 static void
-test_ld_abs_overflow(void)
+test_ld_abs_k_overflow(void)
 {
 	static struct bpf_insn insns[6][2] = {
 		{
@@ -193,7 +193,7 @@ test_ld_ind(void)
 }
 
 static void
-test_ld_ind_overflow(void)
+test_ld_ind_k_overflow(void)
 {
 	static struct bpf_insn insns[6][2] = {
 		{
@@ -289,14 +289,43 @@ test_ld_imm(void)
 	bpfjit_free_code(code);
 }
 
+static void
+test_ld_ind_x_overflow(void)
+{
+	static struct bpf_insn insns[] = {
+		BPF_STMT(BPF_LD+BPF_LEN, 0),
+		BPF_STMT(BPF_ALU+BPF_ADD+BPF_K, UINT32_C(0xffffffff)),
+		BPF_STMT(BPF_MISC+BPF_TAX, 0),
+		BPF_STMT(BPF_LD+BPF_B+BPF_IND, 0),
+		BPF_STMT(BPF_RET+BPF_A, 0)
+	};
+
+	int i;
+	void *code;
+	uint8_t pkt[8] = { 10, 20, 30, 40, 50, 60, 70, 80 };
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	CHECK(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(insns, insn_count);
+	REQUIRE(code != NULL);
+
+	for (i = 1; i <= sizeof(pkt); i++)
+		CHECK(bpfjit_execute_code(pkt, i, i, code) == 10 * i);
+
+	bpfjit_free_code(code);
+}
+
 void
 test_ld(void)
 {
 
 	test_ld_abs();
-	test_ld_abs_overflow();
+	test_ld_abs_k_overflow();
 	test_ld_ind();
-	test_ld_ind_overflow();
+	test_ld_ind_k_overflow();
+	test_ld_ind_x_overflow();
 	test_ld_len();
 	test_ld_imm();
 }
