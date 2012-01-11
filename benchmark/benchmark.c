@@ -45,7 +45,8 @@ unsigned int filter_pkt(uint8_t *pkt, size_t wirelen, size_t buflen);
 
 void usage(const char *prog);
 void test_bpf_filter(size_t counter, size_t dummy);
-void test_bpfjit(size_t counter, size_t dummy);
+void test_bpfjit(size_t counter, const uint8_t *pkt,
+    unsigned int pktsize, size_t dummy);
 void test_c(size_t counter, size_t dummy);
 
 /*
@@ -89,7 +90,8 @@ test_c(size_t counter, size_t dummy)
 }
 
 void
-test_bpfjit(size_t counter, size_t dummy)
+test_bpfjit(size_t counter, const uint8_t *pkt,
+    unsigned int pktsize, size_t dummy)
 {
 	size_t i;
 	void *code;
@@ -98,8 +100,7 @@ test_bpfjit(size_t counter, size_t dummy)
 	code = bpfjit_generate_code(insns, sizeof(insns) / sizeof(insns[0]));
 
 	for (i = 0; i < counter; i++) {
-		ret += bpfjit_execute_code(test_pkt,
-		    sizeof(test_pkt), sizeof(test_pkt), code);
+		ret += bpfjit_execute_code(pkt, pktsize, pktsize, code);
 	}
 
 	bpfjit_free_code(code);
@@ -158,7 +159,7 @@ int main(int argc, char* argv[])
 
 	switch (cmd) {
 	case 'j':
-		test_bpfjit(counter, dummy);
+		test_bpfjit(counter, test_pkt, sizeof(test_pkt), dummy);
 		break;
 	case 'b':
 		test_bpf_filter(counter, dummy);
