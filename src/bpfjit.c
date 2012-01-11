@@ -608,7 +608,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	opts = bpfjit_optimization_hints(insns, insn_count);
 	minm = opts & 0xff;
 	maxm = (opts >> 8) & 0xff;
-	locals_size = (minm <= maxm) ? (maxm - minm + 1) * sizeof(sljit_uw) : 0;
+	locals_size = (minm <= maxm) ? (maxm - minm + 1) * sizeof(uint32_t) : 0;
 
 	jumps = calloc(insn_count, sizeof(jumps[0]));
 	if (jumps == NULL)
@@ -646,9 +646,9 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	if (status != SLJIT_SUCCESS)
 		goto fail;
 
-	for (i = 0; i < locals_size; i+= sizeof(sljit_uw)) {
+	for (i = 0; i < locals_size; i+= sizeof(uint32_t)) {
 		status = sljit_emit_op1(compiler,
-		    SLJIT_MOV,
+		    SLJIT_MOV_UI,
 		    SLJIT_MEM1(SLJIT_LOCALS_REG), i,
 		    SLJIT_IMM, 0);
 		if (status != SLJIT_SUCCESS)
@@ -720,10 +720,10 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				if (pc->k < minm || pc->k > maxm)
 					goto fail;
 				status = sljit_emit_op1(compiler,
-				    SLJIT_MOV,
+				    SLJIT_MOV_UI,
 				    BPFJIT_A, 0,
 				    SLJIT_MEM1(SLJIT_LOCALS_REG),
-				    (pc->k - minm) * sizeof(sljit_uw));
+				    (pc->k - minm) * sizeof(uint32_t));
 				if (status != SLJIT_SUCCESS)
 					goto fail;
 
@@ -876,10 +876,10 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				if (pc->k < minm || pc->k > maxm)
 					goto fail;
 				status = sljit_emit_op1(compiler,
-				    SLJIT_MOV,
+				    SLJIT_MOV_UI,
 				    BPFJIT_X, 0,
 				    SLJIT_MEM1(SLJIT_LOCALS_REG),
-				    (pc->k - minm) * sizeof(sljit_uw));
+				    (pc->k - minm) * sizeof(uint32_t));
 				if (status != SLJIT_SUCCESS)
 					goto fail;
 
@@ -914,9 +914,9 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				goto fail;
 
 			status = sljit_emit_op1(compiler,
-			    SLJIT_MOV,
+			    SLJIT_MOV_UI,
 			    SLJIT_MEM1(SLJIT_LOCALS_REG),
-			    (pc->k - minm) * sizeof(sljit_uw),
+			    (pc->k - minm) * sizeof(uint32_t),
 			    BPFJIT_A, 0);
 			if (status != SLJIT_SUCCESS)
 				goto fail;
@@ -928,9 +928,9 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				goto fail;
 
 			status = sljit_emit_op1(compiler,
-			    SLJIT_MOV,
+			    SLJIT_MOV_UI,
 			    SLJIT_MEM1(SLJIT_LOCALS_REG),
-			    (pc->k - minm) * sizeof(sljit_uw),
+			    (pc->k - minm) * sizeof(uint32_t),
 			    BPFJIT_X, 0);
 			if (status != SLJIT_SUCCESS)
 				goto fail;
