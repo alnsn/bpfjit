@@ -468,7 +468,7 @@ bpfjit_optimization_hints(struct bpf_insn *insns, size_t insn_count)
 {
 	unsigned int rv = BPFJIT_INIT_A;
 	struct bpf_insn *pc;
-	unsigned int minm, maxm;
+	int minm, maxm;
 
 	assert(BPF_MEMWORDS - 1 <= 0xff);
 
@@ -481,7 +481,7 @@ bpfjit_optimization_hints(struct bpf_insn *insns, size_t insn_count)
 			if (BPF_MODE(pc->code) == BPF_IND)
 				rv |= BPFJIT_INIT_X;
 			if (BPF_MODE(pc->code) == BPF_MEM &&
-			    pc->k < BPF_MEMWORDS) {
+			    pc->k >= 0 && pc->k < BPF_MEMWORDS) {
 				if (pc->k > maxm)
 					maxm = pc->k;
 				if (pc->k < minm)
@@ -491,7 +491,7 @@ bpfjit_optimization_hints(struct bpf_insn *insns, size_t insn_count)
 		case BPF_LDX:
 			rv |= BPFJIT_INIT_X;
 			if (BPF_MODE(pc->code) == BPF_MEM &&
-			    pc->k < BPF_MEMWORDS) {
+			    pc->k >= 0 && pc->k < BPF_MEMWORDS) {
 				if (pc->k > maxm)
 					maxm = pc->k;
 				if (pc->k < minm)
@@ -499,7 +499,7 @@ bpfjit_optimization_hints(struct bpf_insn *insns, size_t insn_count)
 			}
 			continue;
 		case BPF_ST:
-			if (pc->k < BPF_MEMWORDS) {
+			if (pc->k >= 0 && pc->k < BPF_MEMWORDS) {
 				if (pc->k > maxm)
 					maxm = pc->k;
 				if (pc->k < minm)
@@ -508,7 +508,7 @@ bpfjit_optimization_hints(struct bpf_insn *insns, size_t insn_count)
 			continue;
 		case BPF_STX:
 			rv |= BPFJIT_INIT_X;
-			if (pc->k < BPF_MEMWORDS) {
+			if (pc->k >= 0 && pc->k < BPF_MEMWORDS) {
 				if (pc->k > maxm)
 					maxm = pc->k;
 				if (pc->k < minm)
@@ -560,8 +560,8 @@ kx_to_reg_arg(struct bpf_insn *pc)
 {
 
 	switch (BPF_SRC(pc->code)) {
-	case BPF_K: return pc->k; /* SLJIT_IMM, pc->k, */
-	case BPF_X: return 0;     /* BPFJIT_X, 0,      */
+	case BPF_K: return (uint32_t)pc->k; /* SLJIT_IMM, pc->k, */
+	case BPF_X: return 0;               /* BPFJIT_X, 0,      */
 	default:
 		assert(false);
 	}
@@ -704,7 +704,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				status = sljit_emit_op1(compiler,
 				    SLJIT_MOV,
 				    BPFJIT_A, 0,
-				    SLJIT_IMM, pc->k);
+				    SLJIT_IMM, (uint32_t)pc->k);
 				if (status != SLJIT_SUCCESS)
 					goto fail;
 
@@ -790,7 +790,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				/* if (pc->k + width > buflen) return 0; */
 				jump = sljit_emit_cmp(compiler,
 				    SLJIT_C_GREATER,
-				    SLJIT_IMM, pc->k + (uint32_t)width,
+				    SLJIT_IMM, (uint32_t)pc->k + width,
 				    BPFJIT_BUFLEN, 0);
 			}
 			if (jump == NULL)
@@ -799,13 +799,13 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 
 			switch (width) {
 			case 4:
-				status = emit_read32(compiler, pc->k);
+				status = emit_read32(compiler, (uint32_t)pc->k);
 				break;
 			case 2:
-				status = emit_read16(compiler, pc->k);
+				status = emit_read16(compiler, (uint32_t)pc->k);
 				break;
 			case 1:
-				status = emit_read8(compiler, pc->k);
+				status = emit_read8(compiler, (uint32_t)pc->k);
 				break;
 			}
 
@@ -843,7 +843,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				status = sljit_emit_op1(compiler,
 				    SLJIT_MOV,
 				    BPFJIT_X, 0,
-				    SLJIT_IMM, pc->k);
+				    SLJIT_IMM, (uint32_t)pc->k);
 				if (status != SLJIT_SUCCESS)
 					goto fail;
 
@@ -894,14 +894,14 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 					/* if (pc->k + 1 > buflen) return 0; */
 					jump = sljit_emit_cmp(compiler,
 					    SLJIT_C_GREATER,
-					    SLJIT_IMM, pc->k + 1,
+					    SLJIT_IMM, (uint32_t)pc->k + 1,
 					    BPFJIT_BUFLEN, 0);
 				}
 				if (jump == NULL)
 					goto fail;
 				ret0[ret0_size++] = jump;
 			
-				status = emit_msh(compiler, pc->k);
+				status = emit_msh(compiler, (uint32_t)pc->k);
 				if (status != SLJIT_SUCCESS)
 					goto fail;
 
@@ -990,9 +990,13 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				if (status != SLJIT_SUCCESS)
 					goto fail;
 			} else if (pc->k != 0) {
-				status = (pc->k & (pc->k - 1)) == 0 ?
-    				    emit_pow2_division(compiler, pc->k) :
-				    emit_division(compiler, SLJIT_IMM, pc->k);
+				if (pc->k & (pc->k - 1)) {
+				    status = emit_division(compiler,
+				        SLJIT_IMM, (uint32_t)pc->k);
+				} else {
+    				    status = emit_pow2_division(compiler,
+				        (uint32_t)pc->k);
+				}
 				if (status != SLJIT_SUCCESS)
 					goto fail;
 			}
@@ -1084,7 +1088,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				status = sljit_emit_op1(compiler,
 				    SLJIT_MOV,
 				    BPFJIT_A, 0,
-				    SLJIT_IMM, pc->k);
+				    SLJIT_IMM, (uint32_t)pc->k);
 				if (status != SLJIT_SUCCESS)
 					goto fail;
 			}
