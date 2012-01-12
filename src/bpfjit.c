@@ -686,12 +686,8 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			label = sljit_emit_label(compiler);
 			if (label == NULL)
 				goto fail;
-			while (!SLIST_EMPTY(&jumps[i])) {
-				bjump = SLIST_FIRST(&jumps[i]);
+			SLIST_FOREACH(bjump, &jumps[i], bj_entries)
 				sljit_set_label(bjump->bj_jump, label);
-				free(bjump);
-				SLIST_REMOVE_HEAD(&jumps[i], bj_entries);
-			}
 		}
 
 		/*
@@ -766,7 +762,6 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				ret0[ret0_size++] = jump;
 
 				/* temporarily do buf += X; buflen -= X; */
-				/* XXX X can be greate than UINT32_MAX */
 				status = sljit_emit_op2(compiler,
 				    SLJIT_ADD,
 				    BPFJIT_BUF, 0,
@@ -891,11 +886,17 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				if (BPF_SIZE(pc->code) != BPF_B)
 					goto fail;
 
-				/* if (pc->k >= buflen) return 0; */
-				jump = sljit_emit_cmp(compiler,
-				    SLJIT_C_GREATER_EQUAL,
-				    SLJIT_IMM, pc->k,
-				    BPFJIT_BUFLEN, 0);
+				if (pc->k == UINT32_MAX) {
+					/* return 0; */
+					jump = sljit_emit_jump(compiler,
+					    SLJIT_JUMP);
+				} else {
+					/* if (pc->k + 1 > buflen) return 0; */
+					jump = sljit_emit_cmp(compiler,
+					    SLJIT_C_GREATER,
+					    SLJIT_IMM, pc->k + 1,
+					    BPFJIT_BUFLEN, 0);
+				}
 				if (jump == NULL)
 					goto fail;
 				ret0[ret0_size++] = jump;
