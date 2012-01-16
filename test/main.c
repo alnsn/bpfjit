@@ -40,6 +40,7 @@ int main(void)
 	test_alu();
 	test_st();
 	test_stx();
+	test_opt();
 
 	return exit_status;
 }
