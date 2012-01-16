@@ -55,7 +55,7 @@ my_be32dec(const void *buf)
  * C code for the following filter program:
  *
  * BPF_STMT(BPF_LD+BPF_H+BPF_ABS, 12),
- * BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, ETHERTYPE_IP, 0, 8),
+ * BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x800, 0, 8),
  * BPF_STMT(BPF_LD+BPF_W+BPF_ABS, 26),
  * BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x8003700f, 0, 2),
  * BPF_STMT(BPF_LD+BPF_W+BPF_ABS, 30),

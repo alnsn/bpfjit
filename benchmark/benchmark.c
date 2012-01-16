@@ -35,17 +35,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#ifdef __linux
-#include <net/ethernet.h>
-#else
-#include <net/ethertypes.h>
-#endif
 
 unsigned int filter_pkt(uint8_t *pkt, size_t wirelen, size_t buflen);
 
 void usage(const char *prog);
 void test_bpf_filter(size_t counter, size_t dummy);
 void test_bpfjit(size_t counter, const uint8_t *pkt,
+    unsigned int pktsize, size_t dummy);
+void test_bpfjit_opt(size_t counter, const uint8_t *pkt,
     unsigned int pktsize, size_t dummy);
 void test_c(size_t counter, size_t dummy);
 
@@ -55,7 +52,7 @@ void test_c(size_t counter, size_t dummy);
  */
 static struct bpf_insn insns[] = {
 	BPF_STMT(BPF_LD+BPF_H+BPF_ABS, 12),
-	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, ETHERTYPE_IP, 0, 8),
+	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x800, 0, 8),
 	BPF_STMT(BPF_LD+BPF_W+BPF_ABS, 26),
 	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x8003700f, 0, 2),
 	BPF_STMT(BPF_LD+BPF_W+BPF_ABS, 30),
@@ -64,7 +61,22 @@ static struct bpf_insn insns[] = {
 	BPF_STMT(BPF_LD+BPF_W+BPF_ABS, 30),
 	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x8003700f, 0, 1),
 	BPF_STMT(BPF_RET+BPF_K, UINT32_MAX),
-	BPF_STMT(BPF_RET+BPF_K, 0),
+	BPF_STMT(BPF_RET+BPF_K, 0)
+};
+
+/* Optimize away two length checks (@26 and @12): */
+static struct bpf_insn insns_opt[] = {
+	BPF_STMT(BPF_LD+BPF_W+BPF_ABS, 30),
+	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x80037023, 0, 2),
+	BPF_STMT(BPF_LD+BPF_W+BPF_ABS, 26),
+	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x8003700f, 3, 6),
+	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x8003700f, 0, 5),
+	BPF_STMT(BPF_LD+BPF_W+BPF_ABS, 26),
+	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x80037023, 0, 3),
+	BPF_STMT(BPF_LD+BPF_H+BPF_ABS, 12),
+	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x800, 0, 1),
+	BPF_STMT(BPF_RET+BPF_K, UINT32_MAX),
+	BPF_STMT(BPF_RET+BPF_K, 0)
 };
 
 static uint8_t test_pkt[128] = {
@@ -110,6 +122,27 @@ test_bpfjit(size_t counter, const uint8_t *pkt,
 }
 
 void
+test_bpfjit_opt(size_t counter, const uint8_t *pkt,
+    unsigned int pktsize, size_t dummy)
+{
+	size_t i;
+	void *code;
+	unsigned int ret = 0;
+
+	code = bpfjit_generate_code(insns_opt,
+	    sizeof(insns_opt) / sizeof(insns_opt[0]));
+
+	for (i = 0; i < counter; i++) {
+		ret += bpfjit_execute_code(pkt, pktsize, pktsize, code);
+	}
+
+	bpfjit_free_code(code);
+
+	if (counter == dummy)
+		printf("bpfjit_execute_code returned %u\n", ret);
+}
+
+void
 test_bpf_filter(size_t counter, size_t dummy)
 {
 	size_t i;
@@ -129,9 +162,10 @@ void usage(const char *prog)
 
 	fprintf(stderr,
 	    "USAGE: time %s -b|-j|-c NNN\n"
-	    " -j  - run bpfjit_execute_code\n"
 	    " -b  - run bpf_filter\n"
 	    " -c  - run C code\n"
+	    " -j  - run bpfjit_execute_code\n"
+	    " -J  - same as above but use an optimized filter program\n"
 	    " NNN - number of iterations\n", prog);
 }
 
@@ -157,9 +191,15 @@ int main(int argc, char* argv[])
 	if (!bpf_validate(insns, sizeof(insns) / sizeof(insns[0])))
 		errx(EXIT_FAILURE, "Not valid bpf program");
 
+	if (!bpf_validate(insns_opt, sizeof(insns_opt) / sizeof(insns_opt[0])))
+		errx(EXIT_FAILURE, "Not valid bpf program");
+
 	switch (cmd) {
 	case 'j':
 		test_bpfjit(counter, test_pkt, sizeof(test_pkt), dummy);
+		break;
+	case 'J':
+		test_bpfjit_opt(counter, test_pkt, sizeof(test_pkt), dummy);
 		break;
 	case 'b':
 		test_bpf_filter(counter, dummy);
