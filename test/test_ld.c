@@ -141,7 +141,7 @@ test_ld_abs_k_overflow(void)
 static void
 test_ld_ind(void)
 {
-	static struct bpf_insn insns[3][3] = {
+	static struct bpf_insn insns[6][3] = {
 		{
 			BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 3),
 			BPF_STMT(BPF_LD+BPF_B+BPF_IND, 2),
@@ -156,11 +156,30 @@ test_ld_ind(void)
 			BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 3),
 			BPF_STMT(BPF_LD+BPF_W+BPF_IND, 2),
 			BPF_STMT(BPF_RET+BPF_A, 0)
+		},
+		{
+			BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 5),
+			BPF_STMT(BPF_LD+BPF_B+BPF_IND, 0),
+			BPF_STMT(BPF_RET+BPF_A, 0)
+		},
+		{
+			BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 5),
+			BPF_STMT(BPF_LD+BPF_H+BPF_IND, 0),
+			BPF_STMT(BPF_RET+BPF_A, 0)
+		},
+		{
+			BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 5),
+			BPF_STMT(BPF_LD+BPF_W+BPF_IND, 0),
+			BPF_STMT(BPF_RET+BPF_A, 0)
 		}
 	};
 
-	static size_t lengths[3] = { 1, 2, 4 };
-	static unsigned int expected[3] = { 0xde, 0xdead, 0xdeadbeef };
+	static size_t lengths[6] = { 1, 2, 4, 1, 2, 4 };
+
+	static unsigned int expected[6] = {
+		0xde, 0xdead, 0xdeadbeef,
+		0xde, 0xdead, 0xdeadbeef
+	};
 
 	int i, l;
 	uint8_t *pkt = deadbeef_at_5;
