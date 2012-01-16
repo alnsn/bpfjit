@@ -139,7 +139,7 @@ test_bpfjit_opt(size_t counter, const uint8_t *pkt,
 	bpfjit_free_code(code);
 
 	if (counter == dummy)
-		printf("bpfjit_execute_code returned %u\n", ret);
+		printf("bpfjit_execute_code (optimized) returned %u\n", ret);
 }
 
 void
