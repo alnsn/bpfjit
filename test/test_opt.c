@@ -125,12 +125,12 @@ test_opt_ld3(void)
 {
 	static struct bpf_insn insns[] = {
 		BPF_STMT(BPF_LD+BPF_W+BPF_ABS, 30),
-		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x8003700f, 0, 2),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x80037023, 0, 2),
 		BPF_STMT(BPF_LD+BPF_W+BPF_ABS, 26),
-		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x80037023, 3, 6),
-		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x80037023, 0, 5),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x8003700f, 3, 6),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x8003700f, 0, 5),
 		BPF_STMT(BPF_LD+BPF_W+BPF_ABS, 26),
-		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x8003700f, 0, 3),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x80037023, 0, 3),
 		BPF_STMT(BPF_LD+BPF_H+BPF_ABS, 12),
 		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x800, 0, 1),
 		BPF_STMT(BPF_RET+BPF_K, UINT32_MAX),
@@ -168,5 +168,5 @@ test_opt(void)
 	test_opt_ld1();
 	test_opt_ld2();
 	test_opt_ld3();
-	/* test BPF_LDX with zero and non-zero pc->k */
+	/* test BPF_MSH and BPF_LDX with zero and non-zero pc->k */
 }
