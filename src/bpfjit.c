@@ -1003,16 +1003,19 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 					/* return 0; */
 					jump = sljit_emit_jump(compiler,
 					    SLJIT_JUMP);
-				} else {
+					if (jump == NULL)
+				  		goto fail;
+				  	ret0[ret0_size++] = jump;
+				} else if (pc->k + 1u > lengths[i]) {
 					/* if (pc->k + 1 > buflen) return 0; */
 					jump = sljit_emit_cmp(compiler,
 					    SLJIT_C_GREATER,
 					    SLJIT_IMM, (uint32_t)pc->k + 1,
 					    BPFJIT_BUFLEN, 0);
+					if (jump == NULL)
+				  		goto fail;
+				  	ret0[ret0_size++] = jump;
 				}
-				if (jump == NULL)
-					goto fail;
-				ret0[ret0_size++] = jump;
 			
 				status = emit_msh(compiler, (uint32_t)pc->k);
 				if (status != SLJIT_SUCCESS)
