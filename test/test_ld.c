@@ -92,35 +92,71 @@ test_ld_abs(void)
 static void
 test_ld_abs_k_overflow(void)
 {
-	static struct bpf_insn insns[6][2] = {
+	static struct bpf_insn insns[12][3] = {
 		{
 			BPF_STMT(BPF_LD+BPF_H+BPF_ABS, UINT32_MAX),
-			BPF_STMT(BPF_RET+BPF_A, 0)
+			BPF_STMT(BPF_LD+BPF_B+BPF_ABS, 7),
+			BPF_STMT(BPF_RET+BPF_K, 1)
 		},
 		{
 			BPF_STMT(BPF_LD+BPF_H+BPF_ABS, UINT32_MAX - 1),
-			BPF_STMT(BPF_RET+BPF_A, 0)
+			BPF_STMT(BPF_LD+BPF_B+BPF_ABS, 7),
+			BPF_STMT(BPF_RET+BPF_K, 1)
 		},
 		{
 			BPF_STMT(BPF_LD+BPF_W+BPF_ABS, UINT32_MAX),
-			BPF_STMT(BPF_RET+BPF_A, 0)
+			BPF_STMT(BPF_LD+BPF_B+BPF_ABS, 7),
+			BPF_STMT(BPF_RET+BPF_K, 1)
 		},
 		{
 			BPF_STMT(BPF_LD+BPF_W+BPF_ABS, UINT32_MAX - 1),
-			BPF_STMT(BPF_RET+BPF_A, 0)
+			BPF_STMT(BPF_LD+BPF_B+BPF_ABS, 7),
+			BPF_STMT(BPF_RET+BPF_K, 1)
 		},
 		{
 			BPF_STMT(BPF_LD+BPF_W+BPF_ABS, UINT32_MAX - 2),
-			BPF_STMT(BPF_RET+BPF_A, 0)
+			BPF_STMT(BPF_LD+BPF_B+BPF_ABS, 7),
+			BPF_STMT(BPF_RET+BPF_K, 1)
 		},
 		{
 			BPF_STMT(BPF_LD+BPF_W+BPF_ABS, UINT32_MAX - 3),
-			BPF_STMT(BPF_RET+BPF_A, 0)
+			BPF_STMT(BPF_LD+BPF_B+BPF_ABS, 7),
+			BPF_STMT(BPF_RET+BPF_K, 1)
 		},
+		{
+			BPF_STMT(BPF_LD+BPF_B+BPF_ABS, 7),
+			BPF_STMT(BPF_LD+BPF_H+BPF_ABS, UINT32_MAX),
+			BPF_STMT(BPF_RET+BPF_K, 1)
+		},
+		{
+			BPF_STMT(BPF_LD+BPF_B+BPF_ABS, 7),
+			BPF_STMT(BPF_LD+BPF_H+BPF_ABS, UINT32_MAX - 1),
+			BPF_STMT(BPF_RET+BPF_K, 1)
+		},
+		{
+			BPF_STMT(BPF_LD+BPF_B+BPF_ABS, 7),
+			BPF_STMT(BPF_LD+BPF_W+BPF_ABS, UINT32_MAX),
+			BPF_STMT(BPF_RET+BPF_K, 1)
+		},
+		{
+			BPF_STMT(BPF_LD+BPF_B+BPF_ABS, 7),
+			BPF_STMT(BPF_LD+BPF_W+BPF_ABS, UINT32_MAX - 1),
+			BPF_STMT(BPF_RET+BPF_K, 1)
+		},
+		{
+			BPF_STMT(BPF_LD+BPF_B+BPF_ABS, 7),
+			BPF_STMT(BPF_LD+BPF_W+BPF_ABS, UINT32_MAX - 2),
+			BPF_STMT(BPF_RET+BPF_K, 1)
+		},
+		{
+			BPF_STMT(BPF_LD+BPF_B+BPF_ABS, 7),
+			BPF_STMT(BPF_LD+BPF_W+BPF_ABS, UINT32_MAX - 3),
+			BPF_STMT(BPF_RET+BPF_K, 1)
+		}
 	};
 
 	int i;
-	uint8_t pkt[8]; /* the program doesn't read any data */
+	uint8_t pkt[8] = { 0 };
 
 	size_t insn_count = sizeof(insns[0]) / sizeof(insns[0][0]);
 
@@ -214,35 +250,71 @@ test_ld_ind(void)
 static void
 test_ld_ind_k_overflow(void)
 {
-	static struct bpf_insn insns[6][2] = {
+	static struct bpf_insn insns[12][3] = {
 		{
 			BPF_STMT(BPF_LD+BPF_H+BPF_IND, UINT32_MAX),
-			BPF_STMT(BPF_RET+BPF_A, 0)
+			BPF_STMT(BPF_LD+BPF_H+BPF_IND, 7),
+			BPF_STMT(BPF_RET+BPF_K, 1)
 		},
 		{
 			BPF_STMT(BPF_LD+BPF_H+BPF_IND, UINT32_MAX - 1),
-			BPF_STMT(BPF_RET+BPF_A, 0)
+			BPF_STMT(BPF_LD+BPF_H+BPF_IND, 7),
+			BPF_STMT(BPF_RET+BPF_K, 1)
 		},
 		{
 			BPF_STMT(BPF_LD+BPF_W+BPF_IND, UINT32_MAX),
-			BPF_STMT(BPF_RET+BPF_A, 0)
+			BPF_STMT(BPF_LD+BPF_H+BPF_IND, 7),
+			BPF_STMT(BPF_RET+BPF_K, 1)
 		},
 		{
 			BPF_STMT(BPF_LD+BPF_W+BPF_IND, UINT32_MAX - 1),
-			BPF_STMT(BPF_RET+BPF_A, 0)
+			BPF_STMT(BPF_LD+BPF_H+BPF_IND, 7),
+			BPF_STMT(BPF_RET+BPF_K, 1)
 		},
 		{
 			BPF_STMT(BPF_LD+BPF_W+BPF_IND, UINT32_MAX - 2),
-			BPF_STMT(BPF_RET+BPF_A, 0)
+			BPF_STMT(BPF_LD+BPF_H+BPF_IND, 7),
+			BPF_STMT(BPF_RET+BPF_K, 1)
 		},
 		{
 			BPF_STMT(BPF_LD+BPF_W+BPF_IND, UINT32_MAX - 3),
-			BPF_STMT(BPF_RET+BPF_A, 0)
+			BPF_STMT(BPF_LD+BPF_H+BPF_IND, 7),
+			BPF_STMT(BPF_RET+BPF_K, 1)
 		},
+		{
+			BPF_STMT(BPF_LD+BPF_H+BPF_IND, 7),
+			BPF_STMT(BPF_LD+BPF_H+BPF_IND, UINT32_MAX),
+			BPF_STMT(BPF_RET+BPF_K, 1)
+		},
+		{
+			BPF_STMT(BPF_LD+BPF_H+BPF_IND, 7),
+			BPF_STMT(BPF_LD+BPF_H+BPF_IND, UINT32_MAX - 1),
+			BPF_STMT(BPF_RET+BPF_K, 1)
+		},
+		{
+			BPF_STMT(BPF_LD+BPF_H+BPF_IND, 7),
+			BPF_STMT(BPF_LD+BPF_W+BPF_IND, UINT32_MAX),
+			BPF_STMT(BPF_RET+BPF_K, 1)
+		},
+		{
+			BPF_STMT(BPF_LD+BPF_H+BPF_IND, 7),
+			BPF_STMT(BPF_LD+BPF_W+BPF_IND, UINT32_MAX - 1),
+			BPF_STMT(BPF_RET+BPF_K, 1)
+		},
+		{
+			BPF_STMT(BPF_LD+BPF_H+BPF_IND, 7),
+			BPF_STMT(BPF_LD+BPF_W+BPF_IND, UINT32_MAX - 2),
+			BPF_STMT(BPF_RET+BPF_K, 1)
+		},
+		{
+			BPF_STMT(BPF_LD+BPF_H+BPF_IND, 7),
+			BPF_STMT(BPF_LD+BPF_W+BPF_IND, UINT32_MAX - 3),
+			BPF_STMT(BPF_RET+BPF_K, 1)
+		}
 	};
 
 	int i;
-	uint8_t pkt[8]; /* the program doesn't read any data */
+	uint8_t pkt[8] = { 0 };
 
 	size_t insn_count = sizeof(insns[0]) / sizeof(insns[0][0]);
 
