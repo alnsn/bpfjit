@@ -365,43 +365,21 @@ emit_division(struct sljit_compiler* compiler, int divt, sljit_w divw)
 }
 
 /*
- * Count
+ * Count the following:
  * returns  - BPF_RET instructions
- * ret0jmp  - out-of-bounds and division by zero jumps
  * branches - jumps with pc->jt != pc->jf
- * XXX do get_ret0_size() separately after optimize()
  */
 static void
 get_sizes(struct bpf_insn *insns, size_t insn_count,
-    size_t *returns, size_t *ret0jmp, size_t *branches)
+    size_t *returns, size_t *branches)
 {
 	struct bpf_insn *pc;
 
 	*returns = 0;
-	*ret0jmp = 0;
 	*branches = 0;
 
 	for (pc = insns; pc != insns + insn_count; pc++) {
 		switch (BPF_CLASS(pc->code)) {
-		case BPF_LD:
-			if (pc->code != (BPF_LD|BPF_IMM) &&
-			    pc->code != (BPF_LD|BPF_MEM)) {
-				switch (BPF_MODE(pc->code)) {
-				case BPF_ABS: *ret0jmp += 1; break;
-				case BPF_IND: *ret0jmp += 2; break;
-				}
-			}
-			continue;
-		case BPF_LDX:
-			if (pc->code == (BPF_LDX|BPF_B|BPF_MSH))
-				*ret0jmp += 1;
-			continue;
-		case BPF_ALU:
-			if (pc->code == (BPF_ALU|BPF_DIV|BPF_X))
-				*ret0jmp += 1;
-			if (pc->code == (BPF_ALU|BPF_DIV|BPF_K) && pc->k == 0)
-				*ret0jmp += 1;
-			continue;
 		case BPF_JMP:
 			if (pc->code != (BPF_JMP|BPF_JA) && pc->jt != pc->jf)
 				*branches += 1;
@@ -413,11 +391,12 @@ get_sizes(struct bpf_insn *insns, size_t insn_count,
 	}
 }
 
-/**
+/*
  * Walk through all branches and calculate a minimal guaranteed
- * length `lengths[i]` of a packet at each intruction i.
+ * length `lengths[i]` of a packet at each intruction i. Lengths
+ * of unreachable instructions are set to UINT_MAX.
  *
- * \param stack an array with a size obtained from get_sizes() call
+ * stack - an array with a size obtained from get_sizes() call.
  */
 static void
 optimize(struct bpf_insn *insns, size_t insn_count,
@@ -498,6 +477,44 @@ optimize(struct bpf_insn *insns, size_t insn_count,
 	}
 
 	assert(false);
+}
+
+/*
+ * Count out-of-bounds and division by zero jumps.
+ *
+ * lengths should be initialized by optimize().
+ */
+static size_t
+get_ret0_size(struct bpf_insn *insns, size_t insn_count, unsigned int *lengths)
+{
+	size_t rv = 0;
+	struct bpf_insn *pc;
+
+	for (pc = insns; pc != insns + insn_count; pc++) {
+		switch (BPF_CLASS(pc->code)) {
+		case BPF_LD:
+			if (pc->code != (BPF_LD|BPF_IMM) &&
+			    pc->code != (BPF_LD|BPF_MEM)) {
+				switch (BPF_MODE(pc->code)) {
+				case BPF_ABS: rv += 1; break;
+				case BPF_IND: rv += 2; break;
+				}
+			}
+			continue;
+		case BPF_LDX:
+			if (pc->code == (BPF_LDX|BPF_B|BPF_MSH))
+				rv += 1;
+			continue;
+		case BPF_ALU:
+			if (pc->code == (BPF_ALU|BPF_DIV|BPF_X))
+				rv += 1;
+			if (pc->code == (BPF_ALU|BPF_DIV|BPF_K) && pc->k == 0)
+				rv += 1;
+			continue;
+		}
+	}
+
+	return rv;
 }
 
 /*
@@ -712,8 +729,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	maxm = (opts >> 8) & 0xff;
 	locals_size = (minm <= maxm) ? (maxm - minm + 1) * sizeof(uint32_t) : 0;
 
-	get_sizes(insns, insn_count, &returns_maxsize,
-	    &ret0_maxsize, &stack_maxsize);
+	get_sizes(insns, insn_count, &returns_maxsize, &stack_maxsize);
 
 	if (returns_maxsize  == 0)
 		goto fail;
@@ -737,17 +753,18 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 
 	optimize(insns, insn_count, stack, lengths);
 
-	returns_size = 0;
-	returns = calloc(returns_maxsize, sizeof(returns[0]));
-	if (returns == NULL)
-		goto fail;
-
 	ret0_size = 0;
+	ret0_maxsize = get_ret0_size(insns, insn_count, lengths);
 	if (ret0_maxsize > 0) {
 		ret0 = calloc(ret0_maxsize, sizeof(ret0[0]));
 		if (ret0 == NULL)
 			goto fail;
 	}
+
+	returns_size = 0;
+	returns = calloc(returns_maxsize, sizeof(returns[0]));
+	if (returns == NULL)
+		goto fail;
 
 	compiler = sljit_create_compiler();
 	if (compiler == NULL)
@@ -792,6 +809,12 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 
 	for (i = 0; i < insn_count; i++) {
 		struct bpf_insn *pc = &insns[i];
+
+		/*
+		 * lengths[i] for an unreachable instruction is set
+		 * to UINT_MAX which can be greater than UINT32_MAX.
+		 */
+		assert(lengths[i] <= UINT32_MAX);
 
 		/*
 		 * Resolve jumps to pc and remove not anymore
