@@ -428,6 +428,7 @@ optimize(struct bpf_insn *insns, size_t insn_count,
 	unsigned int length;
 	struct bpf_insn *pc;
 	unsigned int mode;
+	int width;
 
 	for (i = 0; i < insn_count; i++)
 		lengths[i] = UINT_MAX;
@@ -450,21 +451,26 @@ optimize(struct bpf_insn *insns, size_t insn_count,
 			}
 
 			mode = BPF_MODE(pc->code);
-			if (mode == BPF_ABS || mode == BPF_IND) {
-				unsigned int len = pc->k + read_width(pc);
-				/* XXX can overflow: ^ */
-				if (length < len)
-					length = len;
-			}
+			if (mode != BPF_ABS && mode != BPF_IND)
+				continue;
+			
+			width = read_width(pc);
+			if (pc->k > UINT32_MAX - width)
+				length = UINT32_MAX;
+			else if (length < pc->k + width)
+				length = pc->k + width;
+
 			continue;
 
 		case BPF_LDX:
-			if (pc->code == (BPF_LDX|BPF_B|BPF_MSH)) {
-				unsigned int len = pc->k + 1;
-				/* XXX can overflow: ^ */
-				if (length < len)
-					length = len;
-			}
+			if (pc->code != (BPF_LDX|BPF_B|BPF_MSH))
+				continue;
+
+			if (pc->k == UINT32_MAX)
+				length = UINT32_MAX;
+			else if (length < pc->k + 1)
+				length = pc->k + 1;
+
 			continue;
 
 		case BPF_JMP:
