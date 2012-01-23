@@ -30,7 +30,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-unsigned int filter_pkt(uint8_t *pkt, size_t wirelen, size_t buflen);
+unsigned int filter_pkt(const uint8_t *pkt,
+    unsigned int wirelen, unsigned int buflen);
 
 /* Copied from <sys/endian.h> */
 static __inline uint16_t
@@ -67,7 +68,7 @@ my_be32dec(const void *buf)
  * BPF_STMT(BPF_RET+BPF_K, 0),
  */
 unsigned int
-filter_pkt(uint8_t *pkt, size_t wirelen, size_t buflen)
+filter_pkt(const uint8_t *pkt, unsigned int wirelen, unsigned int buflen)
 {
 	uint32_t x;
 

@@ -36,15 +36,15 @@
 #include <stdlib.h>
 
 
-unsigned int filter_pkt(uint8_t *pkt, size_t wirelen, size_t buflen);
+unsigned int filter_pkt(const uint8_t *pkt,
+    unsigned int wirelen, unsigned int buflen);
 
 void usage(const char *prog);
 void test_bpf_filter(size_t counter, size_t dummy);
-void test_bpfjit(size_t counter, const uint8_t *pkt,
-    unsigned int pktsize, size_t dummy);
-void test_bpfjit_opt(size_t counter, const uint8_t *pkt,
-    unsigned int pktsize, size_t dummy);
-void test_c(size_t counter, size_t dummy);
+
+void
+test_fun(bpfjit_function_t fun, const uint8_t *pkt,
+    unsigned int pktsize, size_t counter, size_t dummy, const char*msg);
 
 /*
  * From bpf(4): This filter accepts only IP packets between host
@@ -89,57 +89,48 @@ static uint8_t test_pkt[128] = {
 
 
 void
-test_c(size_t counter, size_t dummy)
+test_fun(bpfjit_function_t fun, const uint8_t *pkt,
+    unsigned int pktsize, size_t counter, size_t dummy, const char*msg)
 {
 	size_t i;
 	unsigned int ret = 0;
 
 	for (i = 0; i < counter; i++)
-		ret += filter_pkt(test_pkt, sizeof(test_pkt), sizeof(test_pkt));
+		ret += fun(pkt, pktsize, pktsize);
 
 	if (counter == dummy)
-		printf("C code returned %u\n", ret);
+		printf("%s returned %u\n", msg, ret);
 }
 
-void
+static void
+test_c(size_t counter, const uint8_t *pkt,
+    unsigned int pktsize, size_t dummy)
+{
+
+	test_fun(&filter_pkt, pkt, pktsize, counter, dummy, "C code");
+}
+
+static void
 test_bpfjit(size_t counter, const uint8_t *pkt,
     unsigned int pktsize, size_t dummy)
 {
-	size_t i;
 	bpfjit_function_t code;
-	unsigned int ret = 0;
 
 	code = bpfjit_generate_code(insns, sizeof(insns) / sizeof(insns[0]));
-
-	for (i = 0; i < counter; i++) {
-		ret += code(pkt, pktsize, pktsize);
-	}
-
+	test_fun(code, pkt, pktsize, counter, dummy, "bpfjit code");
 	bpfjit_free_code(code);
-
-	if (counter == dummy)
-		printf("bpfjit code returned %u\n", ret);
 }
 
-void
+static void
 test_bpfjit_opt(size_t counter, const uint8_t *pkt,
     unsigned int pktsize, size_t dummy)
 {
-	size_t i;
 	bpfjit_function_t code;
-	unsigned int ret = 0;
 
 	code = bpfjit_generate_code(insns_opt,
 	    sizeof(insns_opt) / sizeof(insns_opt[0]));
-
-	for (i = 0; i < counter; i++) {
-		ret += code(pkt, pktsize, pktsize);
-	}
-
+	test_fun(code, pkt, pktsize, counter, dummy, "bpfjit code (optimized)");
 	bpfjit_free_code(code);
-
-	if (counter == dummy)
-		printf("bpfjit code (optimized) returned %u\n", ret);
 }
 
 void
@@ -205,7 +196,7 @@ int main(int argc, char* argv[])
 		test_bpf_filter(counter, dummy);
 		break;
 	case 'c':
-		test_c(counter, dummy);
+		test_c(counter, test_pkt, sizeof(test_pkt), dummy);
 	}
 
 	return EXIT_SUCCESS;
