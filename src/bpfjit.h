@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2011 Alexander Nasonov.
+ * Copyright (c) 2011-2012 Alexander Nasonov.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,21 +48,12 @@
 #define	bpfjit_unused	/* delete */
 #endif
 
-void *bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count);
-void bpfjit_free_code(void *code);
+typedef unsigned int (*bpfjit_function_t)(const uint8_t *p,
+    unsigned int wirelen, unsigned int buflen);
 
-static inline unsigned int bpfjit_unused
-bpfjit_execute_code(const uint8_t *p, unsigned int wirelen,
-    unsigned int buflen, const void *code)
-{
-	union {
-		const void* code;
-		sljit_uw (SLJIT_CALL *func)(const uint8_t *p,
-		    sljit_uw wirelen, sljit_uw buflen);
-	} func = { code };
+bpfjit_function_t bpfjit_generate_code(struct bpf_insn *insns,
+    size_t insn_count);
 
-	/* Explicit cast to discard high bits on 64bit arches */
-	return (uint32_t)func.func(p, wirelen, buflen);
-}
+void bpfjit_free_code(bpfjit_function_t code);
 
 #endif /* !_NET_BPFJIT_H_ */

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2011 Alexander Nasonov.
+ * Copyright (c) 2011-2012 Alexander Nasonov.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -44,7 +44,7 @@ test_misc_tax(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[] = { 0, 11, 22, 33, 44, 55 };
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -54,7 +54,7 @@ test_misc_tax(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, sizeof(pkt), sizeof(pkt), code) == 55);
+	CHECK(code(pkt, sizeof(pkt), sizeof(pkt)) == 55);
 
 	bpfjit_free_code(code);
 }
@@ -68,7 +68,7 @@ test_misc_txa(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -78,7 +78,7 @@ test_misc_txa(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 391);
+	CHECK(code(pkt, 1, 1) == 391);
 
 	bpfjit_free_code(code);
 }

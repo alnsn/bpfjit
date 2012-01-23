@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2011 Alexander Nasonov.
+ * Copyright (c) 2011-2012 Alexander Nasonov.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -43,7 +43,7 @@ test_ldx_imm1(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -53,7 +53,7 @@ test_ldx_imm1(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_MAX - 5);
+	CHECK(code(pkt, 1, 1) == UINT32_MAX - 5);
 
 	bpfjit_free_code(code);
 }
@@ -69,7 +69,7 @@ test_ldx_imm2(void)
 		BPF_STMT(BPF_RET+BPF_K, UINT32_MAX)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -79,7 +79,7 @@ test_ldx_imm2(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_MAX);
+	CHECK(code(pkt, 1, 1) == UINT32_MAX);
 
 	bpfjit_free_code(code);
 }
@@ -94,7 +94,7 @@ test_ldx_len1(void)
 	};
 
 	size_t i;
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[5]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -105,8 +105,8 @@ test_ldx_len1(void)
 	REQUIRE(code != NULL);
 
 	for (i = 1; i < sizeof(pkt); i++) {
-		CHECK(bpfjit_execute_code(pkt, i, 1, code) == i);
-		CHECK(bpfjit_execute_code(pkt, i + 1, i, code) == i + 1);
+		CHECK(code(pkt, i, 1) == i);
+		CHECK(code(pkt, i + 1, i) == i + 1);
 	}
 
 	bpfjit_free_code(code);
@@ -123,7 +123,7 @@ test_ldx_len2(void)
 		BPF_STMT(BPF_RET+BPF_K, UINT32_MAX)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[5]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -133,8 +133,8 @@ test_ldx_len2(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 5, 1, code) == UINT32_MAX);
-	CHECK(bpfjit_execute_code(pkt, 6, 5, code) == 7);
+	CHECK(code(pkt, 5, 1) == UINT32_MAX);
+	CHECK(code(pkt, 6, 5) == 7);
 
 	bpfjit_free_code(code);
 }
@@ -148,7 +148,7 @@ test_ldx_msh(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[2] = { 0, 0x7a };
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -158,7 +158,7 @@ test_ldx_msh(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 2, 2, code) == 40);
+	CHECK(code(pkt, 2, 2) == 40);
 
 	bpfjit_free_code(code);
 }

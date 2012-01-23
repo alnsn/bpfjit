@@ -49,9 +49,9 @@
 #define BPFJIT_X	SLJIT_TEMPORARY_EREG1
 #define BPFJIT_TMP1	SLJIT_TEMPORARY_REG2
 #define BPFJIT_TMP2	SLJIT_TEMPORARY_REG3
-#define BPFJIT_BUF	SLJIT_GENERAL_REG1
-#define BPFJIT_WIRELEN	SLJIT_GENERAL_REG2
-#define BPFJIT_BUFLEN	SLJIT_GENERAL_REG3
+#define BPFJIT_BUF	SLJIT_SAVED_REG1
+#define BPFJIT_WIRELEN	SLJIT_SAVED_REG2
+#define BPFJIT_BUFLEN	SLJIT_SAVED_REG3
 
 /* 
  * Flags for bpfjit_optimization_hints().
@@ -677,7 +677,7 @@ kx_to_reg_arg(struct bpf_insn *pc)
 	}
 }
 
-void *
+bpfjit_function_t
 bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 {
 	void *rv;
@@ -1305,7 +1305,9 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			sljit_set_label(returns[i], label);
 	}
 
-	status = sljit_emit_return(compiler, BPFJIT_A, 0);
+	status = sljit_emit_return(compiler,
+	    SLJIT_MOV_UI,
+	    BPFJIT_A, 0);
 	if (status != SLJIT_SUCCESS)
 		goto fail;
 
@@ -1324,7 +1326,9 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 		if (status != SLJIT_SUCCESS)
 			goto fail;
 
-		status = sljit_emit_return(compiler, SLJIT_RETURN_REG, 0);
+		status = sljit_emit_return(compiler,
+		    SLJIT_MOV_UI,
+		    SLJIT_RETURN_REG, 0);
 		if (status != SLJIT_SUCCESS)
 			goto fail;
 	}
@@ -1359,12 +1363,12 @@ fail:
 	if (stack != NULL)
 		free(stack);
 
-	return rv;
+	return (bpfjit_function_t)rv;
 }
 
 void
-bpfjit_free_code(void *code)
+bpfjit_free_code(bpfjit_function_t code)
 {
 
-	sljit_free_code(code);
+	sljit_free_code((void *)code);
 }

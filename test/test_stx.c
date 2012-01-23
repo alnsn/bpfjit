@@ -47,7 +47,7 @@ test_stx1(void)
 	};
 
 	size_t i;
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[16]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -58,7 +58,7 @@ test_stx1(void)
 	REQUIRE(code != NULL);
 
 	for (i = 1; i <= sizeof(pkt); i++)
-		CHECK(bpfjit_execute_code(pkt, i, sizeof(pkt), code) == i);
+		CHECK(code(pkt, i, sizeof(pkt)) == i);
 
 	bpfjit_free_code(code);
 }
@@ -74,7 +74,7 @@ test_stx2(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -84,7 +84,7 @@ test_stx2(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0);
+	CHECK(code(pkt, 1, 1) == 0);
 
 	bpfjit_free_code(code);
 }
@@ -111,7 +111,7 @@ test_stx3(void)
 	};
 
 	size_t i;
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[16]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -122,7 +122,7 @@ test_stx3(void)
 	REQUIRE(code != NULL);
 
 	for (i = 1; i <= sizeof(pkt); i++)
-		CHECK(bpfjit_execute_code(pkt, i, sizeof(pkt), code) == 3 * i);
+		CHECK(code(pkt, i, sizeof(pkt)) == 3 * i);
 
 	bpfjit_free_code(code);
 }
@@ -134,7 +134,7 @@ test_stx4(void)
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
 	size_t k;
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[BPF_MEMWORDS]; /* the program doesn't read any data */
 
 	memset(insns, 0, sizeof(insns));
@@ -171,7 +171,7 @@ test_stx4(void)
 	REQUIRE(code != NULL);
 
 	for (k = 1; k <= sizeof(pkt); k++)
-		CHECK(bpfjit_execute_code(pkt, k, k, code) == 3*(k-1));
+		CHECK(code(pkt, k, k) == 3*(k-1));
 
 	bpfjit_free_code(code);
 }

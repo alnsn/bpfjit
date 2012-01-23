@@ -106,19 +106,19 @@ test_bpfjit(size_t counter, const uint8_t *pkt,
     unsigned int pktsize, size_t dummy)
 {
 	size_t i;
-	void *code;
+	bpfjit_function_t code;
 	unsigned int ret = 0;
 
 	code = bpfjit_generate_code(insns, sizeof(insns) / sizeof(insns[0]));
 
 	for (i = 0; i < counter; i++) {
-		ret += bpfjit_execute_code(pkt, pktsize, pktsize, code);
+		ret += code(pkt, pktsize, pktsize);
 	}
 
 	bpfjit_free_code(code);
 
 	if (counter == dummy)
-		printf("bpfjit_execute_code returned %u\n", ret);
+		printf("bpfjit code returned %u\n", ret);
 }
 
 void
@@ -126,20 +126,20 @@ test_bpfjit_opt(size_t counter, const uint8_t *pkt,
     unsigned int pktsize, size_t dummy)
 {
 	size_t i;
-	void *code;
+	bpfjit_function_t code;
 	unsigned int ret = 0;
 
 	code = bpfjit_generate_code(insns_opt,
 	    sizeof(insns_opt) / sizeof(insns_opt[0]));
 
 	for (i = 0; i < counter; i++) {
-		ret += bpfjit_execute_code(pkt, pktsize, pktsize, code);
+		ret += code(pkt, pktsize, pktsize);
 	}
 
 	bpfjit_free_code(code);
 
 	if (counter == dummy)
-		printf("bpfjit_execute_code (optimized) returned %u\n", ret);
+		printf("bpfjit code (optimized) returned %u\n", ret);
 }
 
 void
@@ -164,7 +164,7 @@ void usage(const char *prog)
 	    "USAGE: time %s -b|-j|-c NNN\n"
 	    " -b  - run bpf_filter\n"
 	    " -c  - run C code\n"
-	    " -j  - run bpfjit_execute_code\n"
+	    " -j  - run bpfjit code\n"
 	    " -J  - same as above but use an optimized filter program\n"
 	    " NNN - number of iterations\n", prog);
 }

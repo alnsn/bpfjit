@@ -43,7 +43,7 @@ test_alu_add_k(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -53,7 +53,7 @@ test_alu_add_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 5);
+	CHECK(code(pkt, 1, 1) == 5);
 
 	bpfjit_free_code(code);
 }
@@ -67,7 +67,7 @@ test_alu_sub_k(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -77,7 +77,7 @@ test_alu_sub_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_MAX);
+	CHECK(code(pkt, 1, 1) == UINT32_MAX);
 
 	bpfjit_free_code(code);
 }
@@ -91,7 +91,7 @@ test_alu_mul_k(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -101,7 +101,7 @@ test_alu_mul_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_C(0xfffffffd));
+	CHECK(code(pkt, 1, 1) == UINT32_C(0xfffffffd));
 
 	bpfjit_free_code(code);
 }
@@ -114,7 +114,7 @@ test_alu_div0_k(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -124,7 +124,7 @@ test_alu_div0_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0);
+	CHECK(code(pkt, 1, 1) == 0);
 
 	bpfjit_free_code(code);
 }
@@ -138,7 +138,7 @@ test_alu_div1_k(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -148,7 +148,7 @@ test_alu_div1_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 7);
+	CHECK(code(pkt, 1, 1) == 7);
 
 	bpfjit_free_code(code);
 }
@@ -162,7 +162,7 @@ test_alu_div2_k(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -172,7 +172,7 @@ test_alu_div2_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 3);
+	CHECK(code(pkt, 1, 1) == 3);
 
 	bpfjit_free_code(code);
 }
@@ -186,7 +186,7 @@ test_alu_div4_k(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -196,7 +196,7 @@ test_alu_div4_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_C(0x3fffffff));
+	CHECK(code(pkt, 1, 1) == UINT32_C(0x3fffffff));
 
 	bpfjit_free_code(code);
 }
@@ -210,7 +210,7 @@ test_alu_div10_k(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -220,7 +220,7 @@ test_alu_div10_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_C(429484384));
+	CHECK(code(pkt, 1, 1) == UINT32_C(429484384));
 
 	bpfjit_free_code(code);
 }
@@ -234,7 +234,7 @@ test_alu_div10000_k(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -244,7 +244,7 @@ test_alu_div10000_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_C(429484));
+	CHECK(code(pkt, 1, 1) == UINT32_C(429484));
 
 	bpfjit_free_code(code);
 }
@@ -258,7 +258,7 @@ test_alu_div7609801_k(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -268,7 +268,7 @@ test_alu_div7609801_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 564);
+	CHECK(code(pkt, 1, 1) == 564);
 
 	bpfjit_free_code(code);
 }
@@ -282,7 +282,7 @@ test_alu_div0x80000000_k(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -292,7 +292,7 @@ test_alu_div0x80000000_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 1);
+	CHECK(code(pkt, 1, 1) == 1);
 
 	bpfjit_free_code(code);
 }
@@ -306,7 +306,7 @@ test_alu_and_k(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -316,7 +316,7 @@ test_alu_and_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == (0xdead&0xbeef));
+	CHECK(code(pkt, 1, 1) == (0xdead&0xbeef));
 
 	bpfjit_free_code(code);
 }
@@ -330,7 +330,7 @@ test_alu_or_k(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -340,7 +340,7 @@ test_alu_or_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0xdeadbeef);
+	CHECK(code(pkt, 1, 1) == 0xdeadbeef);
 
 	bpfjit_free_code(code);
 }
@@ -354,7 +354,7 @@ test_alu_lsh_k(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -364,7 +364,7 @@ test_alu_lsh_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0xbeef0000);
+	CHECK(code(pkt, 1, 1) == 0xbeef0000);
 
 	bpfjit_free_code(code);
 }
@@ -378,7 +378,7 @@ test_alu_lsh0_k(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -388,7 +388,7 @@ test_alu_lsh0_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0xdeadbeef);
+	CHECK(code(pkt, 1, 1) == 0xdeadbeef);
 
 	bpfjit_free_code(code);
 }
@@ -402,7 +402,7 @@ test_alu_rsh_k(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -412,7 +412,7 @@ test_alu_rsh_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0x0000dead);
+	CHECK(code(pkt, 1, 1) == 0x0000dead);
 
 	bpfjit_free_code(code);
 }
@@ -426,7 +426,7 @@ test_alu_rsh0_k(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -436,7 +436,7 @@ test_alu_rsh0_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0xdeadbeef);
+	CHECK(code(pkt, 1, 1) == 0xdeadbeef);
 
 	bpfjit_free_code(code);
 }
@@ -482,7 +482,7 @@ test_alu_modulo_k(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -492,8 +492,8 @@ test_alu_modulo_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) != UINT32_C(0x71cbbbc3));
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_C(0x0000a994));
+	CHECK(code(pkt, 1, 1) != UINT32_C(0x71cbbbc3));
+	CHECK(code(pkt, 1, 1) == UINT32_C(0x0000a994));
 
 
 	bpfjit_free_code(code);
@@ -509,7 +509,7 @@ test_alu_add_x(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -519,7 +519,7 @@ test_alu_add_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 5);
+	CHECK(code(pkt, 1, 1) == 5);
 
 	bpfjit_free_code(code);
 }
@@ -534,7 +534,7 @@ test_alu_sub_x(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -544,7 +544,7 @@ test_alu_sub_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_MAX);
+	CHECK(code(pkt, 1, 1) == UINT32_MAX);
 
 	bpfjit_free_code(code);
 }
@@ -559,7 +559,7 @@ test_alu_mul_x(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -569,7 +569,7 @@ test_alu_mul_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_C(0xfffffffd));
+	CHECK(code(pkt, 1, 1) == UINT32_C(0xfffffffd));
 
 	bpfjit_free_code(code);
 }
@@ -583,7 +583,7 @@ test_alu_div0_x(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -593,7 +593,7 @@ test_alu_div0_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0);
+	CHECK(code(pkt, 1, 1) == 0);
 
 	bpfjit_free_code(code);
 }
@@ -608,7 +608,7 @@ test_alu_div1_x(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -618,7 +618,7 @@ test_alu_div1_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 7);
+	CHECK(code(pkt, 1, 1) == 7);
 
 	bpfjit_free_code(code);
 }
@@ -633,7 +633,7 @@ test_alu_div2_x(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -643,7 +643,7 @@ test_alu_div2_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 3);
+	CHECK(code(pkt, 1, 1) == 3);
 
 	bpfjit_free_code(code);
 }
@@ -658,7 +658,7 @@ test_alu_div4_x(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -668,7 +668,7 @@ test_alu_div4_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_C(0x3fffffff));
+	CHECK(code(pkt, 1, 1) == UINT32_C(0x3fffffff));
 
 	bpfjit_free_code(code);
 }
@@ -683,7 +683,7 @@ test_alu_div10_x(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -693,7 +693,7 @@ test_alu_div10_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_C(429484384));
+	CHECK(code(pkt, 1, 1) == UINT32_C(429484384));
 
 	bpfjit_free_code(code);
 }
@@ -708,7 +708,7 @@ test_alu_div10000_x(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -718,7 +718,7 @@ test_alu_div10000_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_C(429484));
+	CHECK(code(pkt, 1, 1) == UINT32_C(429484));
 
 	bpfjit_free_code(code);
 }
@@ -733,7 +733,7 @@ test_alu_div7609801_x(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -743,7 +743,7 @@ test_alu_div7609801_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 564);
+	CHECK(code(pkt, 1, 1) == 564);
 
 	bpfjit_free_code(code);
 }
@@ -758,7 +758,7 @@ test_alu_div0x80000000_x(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -768,7 +768,7 @@ test_alu_div0x80000000_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 1);
+	CHECK(code(pkt, 1, 1) == 1);
 
 	bpfjit_free_code(code);
 }
@@ -783,7 +783,7 @@ test_alu_and_x(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -793,7 +793,7 @@ test_alu_and_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == (0xdead&0xbeef));
+	CHECK(code(pkt, 1, 1) == (0xdead&0xbeef));
 
 	bpfjit_free_code(code);
 }
@@ -808,7 +808,7 @@ test_alu_or_x(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -818,7 +818,7 @@ test_alu_or_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0xdeadbeef);
+	CHECK(code(pkt, 1, 1) == 0xdeadbeef);
 
 	bpfjit_free_code(code);
 }
@@ -833,7 +833,7 @@ test_alu_lsh_x(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -843,7 +843,7 @@ test_alu_lsh_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0xbeef0000);
+	CHECK(code(pkt, 1, 1) == 0xbeef0000);
 
 	bpfjit_free_code(code);
 }
@@ -858,7 +858,7 @@ test_alu_lsh0_x(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -868,7 +868,7 @@ test_alu_lsh0_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0xdeadbeef);
+	CHECK(code(pkt, 1, 1) == 0xdeadbeef);
 
 	bpfjit_free_code(code);
 }
@@ -883,7 +883,7 @@ test_alu_rsh_x(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -893,7 +893,7 @@ test_alu_rsh_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0x0000dead);
+	CHECK(code(pkt, 1, 1) == 0x0000dead);
 
 	bpfjit_free_code(code);
 }
@@ -908,7 +908,7 @@ test_alu_rsh0_x(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -918,7 +918,7 @@ test_alu_rsh0_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0xdeadbeef);
+	CHECK(code(pkt, 1, 1) == 0xdeadbeef);
 
 	bpfjit_free_code(code);
 }
@@ -932,7 +932,7 @@ test_alu_neg(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -942,7 +942,7 @@ test_alu_neg(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == 0u-777u);
+	CHECK(code(pkt, 1, 1) == 0u-777u);
 
 	bpfjit_free_code(code);
 }
@@ -997,7 +997,7 @@ test_alu_modulo_x(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -1007,8 +1007,8 @@ test_alu_modulo_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) != UINT32_C(0x71cbbbc3));
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_C(0x0000a994));
+	CHECK(code(pkt, 1, 1) != UINT32_C(0x71cbbbc3));
+	CHECK(code(pkt, 1, 1) == UINT32_C(0x0000a994));
 
 
 	bpfjit_free_code(code);

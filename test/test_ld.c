@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2011 Alexander Nasonov.
+ * Copyright (c) 2011-2012 Alexander Nasonov.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -66,7 +66,7 @@ test_ld_abs(void)
 	size_t insn_count = sizeof(insns[0]) / sizeof(insns[0][0]);
 
 	for (i = 0; i < 3; i++) {
-		void *code;
+		bpfjit_function_t code;
 
 		CHECK(bpf_validate(insns[i], insn_count));
 
@@ -74,16 +74,16 @@ test_ld_abs(void)
 		REQUIRE(code != NULL);
 
 		for (l = 0; l < 5 + lengths[i]; l++) {
-			CHECK(bpfjit_execute_code(pkt, l, l, code) == 0);
-			CHECK(bpfjit_execute_code(pkt, pktsize, l, code) == 0);
+			CHECK(code(pkt, l, l) == 0);
+			CHECK(code(pkt, pktsize, l) == 0);
 		}
 
 		l = 5 + lengths[i];
-		CHECK(bpfjit_execute_code(pkt, l, l, code) == expected[i]);
-		CHECK(bpfjit_execute_code(pkt, pktsize, l, code) == expected[i]);
+		CHECK(code(pkt, l, l) == expected[i]);
+		CHECK(code(pkt, pktsize, l) == expected[i]);
 
 		l = pktsize;
-		CHECK(bpfjit_execute_code(pkt, l, l, code) == expected[i]);
+		CHECK(code(pkt, l, l) == expected[i]);
 
 		bpfjit_free_code(code);
 	}
@@ -161,14 +161,14 @@ test_ld_abs_k_overflow(void)
 	size_t insn_count = sizeof(insns[0]) / sizeof(insns[0][0]);
 
 	for (i = 0; i < 3; i++) {
-		void *code;
+		bpfjit_function_t code;
 
 		CHECK(bpf_validate(insns[i], insn_count));
 
 		code = bpfjit_generate_code(insns[i], insn_count);
 		REQUIRE(code != NULL);
 
-		CHECK(bpfjit_execute_code(pkt, 8, 8, code) == 0);
+		CHECK(code(pkt, 8, 8) == 0);
 
 		bpfjit_free_code(code);
 	}
@@ -224,7 +224,7 @@ test_ld_ind(void)
 	size_t insn_count = sizeof(insns[0]) / sizeof(insns[0][0]);
 
 	for (i = 0; i < 3; i++) {
-		void *code;
+		bpfjit_function_t code;
 
 		CHECK(bpf_validate(insns[i], insn_count));
 
@@ -232,16 +232,16 @@ test_ld_ind(void)
 		REQUIRE(code != NULL);
 
 		for (l = 0; l < 5 + lengths[i]; l++) {
-			CHECK(bpfjit_execute_code(pkt, l, l, code) == 0);
-			CHECK(bpfjit_execute_code(pkt, pktsize, l, code) == 0);
+			CHECK(code(pkt, l, l) == 0);
+			CHECK(code(pkt, pktsize, l) == 0);
 		}
 
 		l = 5 + lengths[i];
-		CHECK(bpfjit_execute_code(pkt, l, l, code) == expected[i]);
-		CHECK(bpfjit_execute_code(pkt, pktsize, l, code) == expected[i]);
+		CHECK(code(pkt, l, l) == expected[i]);
+		CHECK(code(pkt, pktsize, l) == expected[i]);
 
 		l = pktsize;
-		CHECK(bpfjit_execute_code(pkt, l, l, code) == expected[i]);
+		CHECK(code(pkt, l, l) == expected[i]);
 
 		bpfjit_free_code(code);
 	}
@@ -319,14 +319,14 @@ test_ld_ind_k_overflow(void)
 	size_t insn_count = sizeof(insns[0]) / sizeof(insns[0][0]);
 
 	for (i = 0; i < 3; i++) {
-		void *code;
+		bpfjit_function_t code;
 
 		CHECK(bpf_validate(insns[i], insn_count));
 
 		code = bpfjit_generate_code(insns[i], insn_count);
 		REQUIRE(code != NULL);
 
-		CHECK(bpfjit_execute_code(pkt, 8, 8, code) == 0);
+		CHECK(code(pkt, 8, 8) == 0);
 
 		bpfjit_free_code(code);
 	}
@@ -341,7 +341,7 @@ test_ld_len(void)
 	};
 
 	int i;
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[32]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -352,7 +352,7 @@ test_ld_len(void)
 	REQUIRE(code != NULL);
 
 	for (i = 0; i < sizeof(pkt); i++)
-		CHECK(bpfjit_execute_code(pkt, i, 1, code) == i);
+		CHECK(code(pkt, i, 1) == i);
 
 	bpfjit_free_code(code);
 }
@@ -365,7 +365,7 @@ test_ld_imm(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -375,7 +375,7 @@ test_ld_imm(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_execute_code(pkt, 1, 1, code) == UINT32_MAX);
+	CHECK(code(pkt, 1, 1) == UINT32_MAX);
 
 	bpfjit_free_code(code);
 }
@@ -392,7 +392,7 @@ test_ld_ind_x_overflow1(void)
 	};
 
 	int i;
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[8] = { 10, 20, 30, 40, 50, 60, 70, 80 };
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -404,7 +404,7 @@ test_ld_ind_x_overflow1(void)
 
 	for (i = 1; i <= sizeof(pkt); i++) {
 		CHECK(bpf_filter(insns, pkt, i, i) == 10 * i);
-		CHECK(bpfjit_execute_code(pkt, i, i, code) == 10 * i);
+		CHECK(code(pkt, i, i) == 10 * i);
 	}
 
 	bpfjit_free_code(code);
@@ -423,7 +423,7 @@ test_ld_ind_x_overflow2(void)
 	};
 
 	int i;
-	void *code;
+	bpfjit_function_t code;
 	uint8_t pkt[8] = { 10, 20, 30, 40, 50, 60, 70, 80 };
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -435,7 +435,7 @@ test_ld_ind_x_overflow2(void)
 
 	for (i = 1; i <= sizeof(pkt); i++) {
 		CHECK(bpf_filter(insns, pkt, i, i) == 10 * i);
-		CHECK(bpfjit_execute_code(pkt, i, i, code) == 10 * i);
+		CHECK(code(pkt, i, i) == 10 * i);
 	}
 
 	bpfjit_free_code(code);
