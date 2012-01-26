@@ -705,7 +705,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	struct bpfjit_stack_entry *stack;
 	size_t stack_maxsize;
 
-	/* minimal guaranteed length that doesn't need a check */
+	/* minimal guaranteed lengths that don't need to be checked */
 	unsigned int *lengths;
 
 	/* for local use */
@@ -812,13 +812,14 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 
 		/*
 		 * lengths[i] for an unreachable instruction is set
-		 * to UINT_MAX which can be greater than UINT32_MAX.
+		 * to UINT_MAX which can be greater than UINT32_MAX
+		 * on ILP64 platforms. The assert make sense only on
+		 * those platforms.
 		 */
 		assert(lengths[i] <= UINT32_MAX);
 
 		/*
-		 * Resolve jumps to pc and remove not anymore
-		 * needed bpfjit_jump entries from the list.
+		 * Resolve jumps to the current instruction.
 		 */
 		if (!SLIST_EMPTY(&jumps[i])) {
 			label = sljit_emit_label(compiler);
