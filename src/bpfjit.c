@@ -66,10 +66,17 @@ struct bpfjit_jump
 	SLIST_ENTRY(bpfjit_jump) bj_entries;
 };
 
+struct bpfjit_insn_data
+{
+	uint32_t bj_length;
+	bool bj_jump_dst;
+	bool bj_unreachable;
+};
+
 struct bpfjit_stack_entry
 {
 	struct bpf_insn *bj_insn;
-	unsigned int bj_length;
+	uint32_t bj_length;
 };
 
 
@@ -315,7 +322,6 @@ emit_division(struct sljit_compiler* compiler, int divt, sljit_w divw)
     BPFJIT_X == SLJIT_RETURN_REG     || \
     BPFJIT_X == SLJIT_TEMPORARY_REG2 || \
     BPFJIT_A == SLJIT_TEMPORARY_REG2
-/* We don't save A and X. */
 #error "Not supported assignment of registers."
 #endif
 
@@ -392,32 +398,93 @@ get_sizes(struct bpf_insn *insns, size_t insn_count,
 }
 
 /*
- * Walk through all branches and calculate a minimal guaranteed
- * length `lengths[i]` of a packet at each intruction i. Lengths
- * of unreachable instructions are set to UINT_MAX.
+ * The first optimization pass divides instructions into linear blocks.
+ * A block either don't have BPF_RET and BPF_JMP instructions or one
+ * of these instructions is the last instruction in the block. Any jump
+ * instruction always points to the first instruction of some block.
+ * The function also sets initial values of bj_length fields to complete
+ * an initialization of insn_dat elements.
+ * XXX finish implementation
+ */
+static void
+optimize_pass1(struct bpf_insn *insns,
+    struct bpfjit_insn_data *insn_dat, size_t insn_count)
+{
+	size_t i;
+	int unreachable;
+	struct bpf_insn *pc;
+	uint32_t jsh; /* shorter jump */
+
+	for (i = 0; i < insn_count; i++) {
+		insn_dat[i].bj_jump_dst = 0;
+		insn_dat[i].bj_length = UINT32_MAX;
+	}
+
+	unreachable = 0;
+	for (i = 0; i < insn_count; i++) {
+		if (insn_dat[i].bj_jump_dst)
+			unreachable = 0;
+
+		insn_dat[i].bj_unreachable = unreachable;
+
+		if (unreachable)
+			continue;
+		
+		pc = &insns[i];
+		switch (BPF_CLASS(pc->code)) {
+		case BPF_RET:
+			unreachable = 1;
+			continue;
+
+		case BPF_JMP:
+			if (pc->code == (BPF_JMP|BPF_JA)) {
+				assert(insn_count - (i + 1) > pc->k);
+				insn_dat[i + 1 + pc->k].bj_jump_dst = 1;
+				jsh = i + 1 + pc->k;
+			} else {
+				assert(insn_count - (i + 1) > pc->jf);
+				assert(insn_count - (i + 1) > pc->jt);
+				insn_dat[i + 1 + pc->jf].bj_jump_dst = 1;
+				insn_dat[i + 1 + pc->jt].bj_jump_dst = 1;
+				jsh = pc->jf < pc->jt ? pc->jf : pc->jt;
+				jsh += i + 1;
+			}
+
+			if (jsh > 0)
+				unreachable = 1;
+
+			continue;
+		}
+	}
+}
+
+/*
+ * Walk through all branches and calculate:
+ *  (a) a guaranteed minimum length of a packet,
+ *  (b) XXX loaded/unloaded flag of all M[k], A and X registers
+ * at each intruction i.
  *
  * stack - an array with a size obtained from get_sizes() call.
  */
 static void
-optimize(struct bpf_insn *insns, size_t insn_count,
-    struct bpfjit_stack_entry stack[], unsigned int *lengths)
+optimize(struct bpf_insn *insns,
+    struct bpfjit_insn_data *insn_dat, size_t insn_count,
+    struct bpfjit_stack_entry stack[])
 {
-	size_t i;
 	size_t depth;
-	unsigned int length;
+	uint32_t length;
 	struct bpf_insn *pc;
 	unsigned int mode;
 	int width;
 
-	for (i = 0; i < insn_count; i++)
-		lengths[i] = UINT_MAX;
+	optimize_pass1(insns, insn_dat, insn_count);
 
 	depth = 0;
 	length = 0;
 	for (pc = insns; pc != insns + insn_count; pc++) {
 
-		if (lengths[pc - insns] > length)
-			lengths[pc - insns] = length;
+		if (insn_dat[pc - insns].bj_length > length)
+			insn_dat[pc - insns].bj_length = length;
 
 		switch (BPF_CLASS(pc->code)) {
 		default:
@@ -467,25 +534,25 @@ optimize(struct bpf_insn *insns, size_t insn_count,
 
 		case BPF_RET:
 			if (depth == 0)
-				return;
+				break;
 			depth--;
 			pc     = stack[depth].bj_insn;
 			length = stack[depth].bj_length;
 			continue;
-
 		}
 	}
 
-	assert(false);
+	assert(depth == 0); /* valid program should end with BPF_RET */
 }
 
 /*
  * Count out-of-bounds and division by zero jumps.
  *
- * lengths should be initialized by optimize().
+ * insn_dat should be initialized by optimize().
  */
 static size_t
-get_ret0_size(struct bpf_insn *insns, size_t insn_count, unsigned int *lengths)
+get_ret0_size(struct bpf_insn *insns, size_t insn_count,
+    struct bpfjit_insn_data *insn_dat)
 {
 	size_t rv = 0;
 	struct bpf_insn *pc;
@@ -705,8 +772,11 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	struct bpfjit_stack_entry *stack;
 	size_t stack_maxsize;
 
-	/* minimal guaranteed lengths that don't need to be checked */
-	unsigned int *lengths;
+	/*
+	 * minimal guaranteed lengths that don't need to be checked
+	 * XXX
+	 */
+	struct bpfjit_insn_data *insn_dat;
 
 	/* for local use */
 	struct sljit_label *label;
@@ -718,7 +788,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 
 	rv = NULL;
 	compiler = NULL;
-	lengths = NULL;
+	insn_dat = NULL;
 	jumps = NULL;
 	returns = NULL;
 	ret0 = NULL;
@@ -734,8 +804,8 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	if (returns_maxsize  == 0)
 		goto fail;
 
-	lengths = calloc(insn_count, sizeof(lengths[0]));
-	if (lengths == NULL)
+	insn_dat = calloc(insn_count, sizeof(insn_dat[0]));
+	if (insn_dat == NULL)
 		goto fail;
 
 	jumps = calloc(insn_count, sizeof(jumps[0]));
@@ -751,10 +821,10 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			goto fail;
 	}
 
-	optimize(insns, insn_count, stack, lengths);
+	optimize(insns, insn_dat, insn_count, stack);
 
 	ret0_size = 0;
-	ret0_maxsize = get_ret0_size(insns, insn_count, lengths);
+	ret0_maxsize = get_ret0_size(insns, insn_count, insn_dat);
 	if (ret0_maxsize > 0) {
 		ret0 = calloc(ret0_maxsize, sizeof(ret0[0]));
 		if (ret0 == NULL)
@@ -811,15 +881,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 		struct bpf_insn *pc = &insns[i];
 
 		/*
-		 * lengths[i] for an unreachable instruction is set
-		 * to UINT_MAX which can be greater than UINT32_MAX
-		 * on ILP64 platforms. The assert make sense only on
-		 * those platforms.
-		 */
-		assert(lengths[i] <= UINT32_MAX);
-
-		/*
-		 * Resolve jumps to the current instruction.
+		 * Resolve jumps to the cur instruction.
 		 */
 		if (!SLIST_EMPTY(&jumps[i])) {
 			label = sljit_emit_label(compiler);
@@ -929,7 +991,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 					goto fail;
 				ret0[ret0_size++] = jump;
 			} else if (mode == BPF_IND ||
-			    pc->k + width > lengths[i]) {
+			    pc->k + width > insn_dat[i].bj_length) {
 				/* if (pc->k + width > buflen) return 0; */
 				jump = sljit_emit_cmp(compiler,
 				    SLJIT_C_GREATER,
@@ -1036,7 +1098,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 					if (jump == NULL)
 				  		goto fail;
 				  	ret0[ret0_size++] = jump;
-				} else if (pc->k + 1u > lengths[i]) {
+				} else if (pc->k + 1u > insn_dat[i].bj_length) {
 					/* if (pc->k + 1 > buflen) return 0; */
 					jump = sljit_emit_cmp(compiler,
 					    SLJIT_C_GREATER,
@@ -1340,8 +1402,8 @@ fail:
 	if (compiler != NULL)
 		sljit_free_compiler(compiler);
 
-	if (lengths != NULL)
-		free(lengths);
+	if (insn_dat != NULL)
+		free(insn_dat);
 
 	if (jumps != NULL) {
 		for (i = 0; i < insn_count; i++) {
