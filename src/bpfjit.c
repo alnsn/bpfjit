@@ -60,10 +60,26 @@
 #define BPFJIT_INIT_A 0x20000
 
 
+/*
+ * Node of bj_jumps list.
+ */
 struct bpfjit_jump
 {
 	struct sljit_jump *bj_jump;
 	SLIST_ENTRY(bpfjit_jump) bj_entries;
+};
+
+/*
+ * BPF_JMP specific data.
+ */
+struct bpfjit_jump_data
+{
+	/*
+	 * These entries make up bj_jumps list:
+	 * bj_jtf[0] - when coming from jt path,
+	 * bj_jtf[1] - when coming from jf path.
+	 */
+	struct bpfjit_jump bj_jtf[2];
 };
 
 struct bpfjit_insn_data
@@ -74,12 +90,9 @@ struct bpfjit_insn_data
 	/* List of jumps to this insn. */
 	SLIST_HEAD(, bpfjit_jump) bj_jumps;
 
-	/*
-	 * These entries make up bj_jumps list.
-	 * bj_jtf[0] - for jt
-	 * bj_jtf[1] - for jf
-	 */
-	struct bpfjit_jump bj_jtf[2];
+	union {
+		struct bpfjit_jump_data bj_jdata;
+	} bj_aux;
 };
 
 struct bpfjit_stack_entry
@@ -423,13 +436,11 @@ optimize_pass1(struct bpf_insn *insns,
 	int unreachable;
 	uint32_t jt, jf;
 	struct bpf_insn *pc;
-	struct bpfjit_insn_data *jdst;
+	struct bpfjit_jump *jtf;
 
 	for (i = 0; i < insn_count; i++) {
 		insn_dat[i].bj_length = UINT32_MAX;
 		SLIST_INIT(&insn_dat[i].bj_jumps);
-		insn_dat[i].bj_jtf[0].bj_jump = NULL;
-		insn_dat[i].bj_jtf[1].bj_jump = NULL;
 	}
 
 	unreachable = 0;
@@ -464,14 +475,16 @@ optimize_pass1(struct bpf_insn *insns,
 			if (jt > 0 && jf > 0)
 				unreachable = 1;
 
-			jdst = &insn_dat[i + 1 + jt];
-			SLIST_INSERT_HEAD(&jdst->bj_jumps,
-			    &insn_dat[i].bj_jtf[0], bj_entries);
+			jtf = insn_dat[i].bj_aux.bj_jdata.bj_jtf;
+
+			jtf[0].bj_jump = NULL;
+			SLIST_INSERT_HEAD(&insn_dat[i + 1 + jt].bj_jumps,
+			    &jtf[0], bj_entries);
 
 			if (jf != jt) {
-				jdst = &insn_dat[i + 1 + jf];
-				SLIST_INSERT_HEAD(&jdst->bj_jumps,
-				    &insn_dat[i].bj_jtf[1], bj_entries);
+				jtf[1].bj_jump = NULL;
+				SLIST_INSERT_HEAD(&insn_dat[i + 1 + jf].bj_jumps,
+				    &jtf[1], bj_entries);
 			}
 
 			continue;
@@ -777,7 +790,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	size_t i;
 	int status;
 	int width;
-	int jalways, negate;
+	int branching, negate;
 	unsigned int rval, mode, src;
 	size_t locals_size;
 	int minm, maxm; /* min/max k for M[k] */
@@ -806,7 +819,8 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	/* for local use */
 	struct sljit_label *label;
 	struct sljit_jump *jump;
-	struct bpfjit_jump *bjump;
+	struct bpfjit_jump *bjump, *jtf;
+
 
 	uint32_t jt, jf;
 
@@ -1243,9 +1257,10 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			}
 
 			negate = (jt == 0) ? 1 : 0;
-			jalways = (jt == jf) ? 1 : 0;
+			branching = (jt == jf) ? 0 : 1;
+			jtf = insn_dat[i].bj_aux.bj_jdata.bj_jtf;
 
-			if (!jalways) {
+			if (branching) {
 				if (BPF_OP(pc->code) != BPF_JSET) {
 					jump = sljit_emit_cmp(compiler,
 					    bpf_jmp_to_sljit_cond(pc, negate),
@@ -1269,22 +1284,17 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				if (jump == NULL)
 					goto fail;
 
-				bjump = &insn_dat[i].bj_jtf[negate];
-				assert(bjump->bj_jump == NULL);
-
-				bjump->bj_jump = jump;
+				assert(jtf[negate].bj_jump == NULL);
+				jtf[negate].bj_jump = jump;
 			}
 
-			if (jalways || (jt != 0 && jf != 0)) {
+			if (!branching || (jt != 0 && jf != 0)) {
 				jump = sljit_emit_jump(compiler, SLJIT_JUMP);
 				if (jump == NULL)
 					goto fail;
 
-				bjump = &insn_dat[i].bj_jtf[1 - jalways];
-				assert(bjump->bj_jump == NULL);
-
-				bjump->bj_jump = jump;
-
+				assert(jtf[branching].bj_jump == NULL);
+				jtf[branching].bj_jump = jump;
 			}
 
 			continue;
