@@ -106,7 +106,7 @@ struct bpfjit_insn_data
 };
 
 
-static int
+static uint32_t
 read_width(struct bpf_insn *pc)
 {
 
@@ -119,7 +119,6 @@ read_width(struct bpf_insn *pc)
 		return 1;
 	default:
 		assert(false);
-		return -1;
 	}
 }
 
@@ -421,7 +420,7 @@ static bool
 read_pkt_insn(struct bpf_insn *pc, uint32_t *length)
 {
 	bool rv;
-	int width;
+	uint32_t width;
 
 	switch (BPF_CLASS(pc->code)) {
 	default:
@@ -739,7 +738,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	void *rv;
 	size_t i;
 	int status;
-	int width;
+	uint32_t width;
 	int branching, negate;
 	unsigned int rval, mode, src;
 	size_t locals_size;
@@ -959,8 +958,6 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			}
 
 			width = read_width(pc);
-			if (width == -1)
-				goto fail;
 
 			if (pc->k > UINT32_MAX - width) {
 				/* return 0; */
