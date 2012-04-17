@@ -67,10 +67,11 @@ struct bpfjit_jump
 {
 	struct sljit_jump *bj_jump;
 	SLIST_ENTRY(bpfjit_jump) bj_entries;
+	uint32_t bj_length;
 };
 
 /*
- * BPF_JMP specific data.
+ * Data for BPF_JMP instruction.
  */
 struct bpfjit_jump_data
 {
@@ -82,23 +83,26 @@ struct bpfjit_jump_data
 	struct bpfjit_jump bj_jtf[2];
 };
 
-struct bpfjit_insn_data
+/*
+ * Data for "read from packet" instructions.
+ * See also read_pkt_insn() function below.
+ */
+struct bpfjit_read_pkt_data
 {
 	uint32_t bj_length;
-	bool bj_unreachable;
+};
 
+struct bpfjit_insn_data
+{
 	/* List of jumps to this insn. */
 	SLIST_HEAD(, bpfjit_jump) bj_jumps;
 
 	union {
-		struct bpfjit_jump_data bj_jdata;
+		struct bpfjit_jump_data     bj_jdata;
+		struct bpfjit_read_pkt_data bj_rdata;
 	} bj_aux;
-};
 
-struct bpfjit_stack_entry
-{
-	struct bpf_insn *bj_insn;
-	uint32_t bj_length;
+	bool bj_unreachable;
 };
 
 
@@ -393,78 +397,112 @@ emit_division(struct sljit_compiler* compiler, int divt, sljit_w divw)
 }
 
 /*
- * Count the following:
- * returns  - BPF_RET instructions
- * branches - jumps with pc->jt != pc->jf
+ * Count BPF_RET instructions.
  */
-static void
-get_sizes(struct bpf_insn *insns, size_t insn_count,
-    size_t *returns, size_t *branches)
+static size_t
+count_returns(struct bpf_insn *insns, size_t insn_count)
 {
-	struct bpf_insn *pc;
+	size_t i;
+	size_t rv;
 
-	*returns = 0;
-	*branches = 0;
-
-	for (pc = insns; pc != insns + insn_count; pc++) {
-		switch (BPF_CLASS(pc->code)) {
-		case BPF_JMP:
-			if (pc->code != (BPF_JMP|BPF_JA) && pc->jt != pc->jf)
-				*branches += 1;
-			continue;
-		case BPF_RET:
-			*returns += 1;
-			continue;
-		}
+	rv = 0;
+	for (i = 0; i < insn_count; i++) {
+		if (BPF_CLASS(insns[i].code) == BPF_RET)
+			rv++;
 	}
+
+	return rv;
 }
 
 /*
- * The first optimization pass divides instructions into linear blocks.
- * A block either don't have BPF_RET and BPF_JMP instructions or one
- * of these instructions is the last instruction in the block. Any jump
- * instruction always points to the first instruction of some block.
- * The function also sets initial values of bj_length fields to complete
- * an initialization of insn_dat elements.
+ * Return true if pc is a "read from packet" instruction.
+ */
+static bool
+read_pkt_insn(struct bpf_insn *pc, uint32_t *length)
+{
+	bool rv;
+	int width;
+
+	switch (BPF_CLASS(pc->code)) {
+	default:
+		rv = false;
+		break;
+
+	case BPF_LD:
+		rv = BPF_MODE(pc->code) == BPF_ABS ||
+		     BPF_MODE(pc->code) == BPF_IND;
+		if (rv)
+			width = read_width(pc);
+		break;
+
+	case BPF_LDX:
+		rv = pc->code == (BPF_LDX|BPF_B|BPF_MSH);
+		width = 1;
+		break;
+	}
+
+	if (rv && length != NULL) {
+		*length = (pc->k > UINT32_MAX - width) ?
+		    UINT32_MAX : pc->k + width;
+	}
+
+	return rv;
+}
+
+/*
+ * The function divides instructions into linear blocks. A block either
+ * don't have BPF_RET and BPF_JMP instructions or one of these instructions
+ * is the last instruction in the block. Any jump instruction always points
+ * to the first instruction of some block.
  * XXX finish implementation
  */
 static int
-optimize_pass1(struct bpf_insn *insns,
+optimize(struct bpf_insn *insns,
     struct bpfjit_insn_data *insn_dat, size_t insn_count)
 {
 	size_t i;
 	int unreachable;
 	uint32_t jt, jf;
-	struct bpf_insn *pc;
-	struct bpfjit_jump *jtf;
+	uint32_t length, safe_length;
+	struct bpfjit_jump *jmp, *jtf;
 
-	for (i = 0; i < insn_count; i++) {
-		insn_dat[i].bj_length = UINT32_MAX;
+	for (i = 0; i < insn_count; i++)
 		SLIST_INIT(&insn_dat[i].bj_jumps);
-	}
 
+	safe_length = 0;
 	unreachable = 0;
 	for (i = 0; i < insn_count; i++) {
-		if (!SLIST_EMPTY(&insn_dat[i].bj_jumps))
+
+		if (!SLIST_EMPTY(&insn_dat[i].bj_jumps)) {
 			unreachable = 0;
+			safe_length = UINT32_MAX; // insn_count should work too
+			SLIST_FOREACH(jmp, &insn_dat[i].bj_jumps, bj_entries) {
+				if (jmp->bj_length < safe_length)
+					safe_length = jmp->bj_length;
+			}
+		}
 
 		insn_dat[i].bj_unreachable = unreachable;
-
 		if (unreachable)
 			continue;
-		
-		pc = &insns[i];
-		switch (BPF_CLASS(pc->code)) {
+
+		if (read_pkt_insn(&insns[i], &length)) {
+			insn_dat[i].bj_aux.bj_rdata.bj_length = safe_length;
+			if (length > safe_length)
+				safe_length = length;
+		}
+
+		switch (BPF_CLASS(insns[i].code)) {
 		case BPF_RET:
 			unreachable = 1;
 			continue;
 
 		case BPF_JMP:
-			if (pc->code == (BPF_JMP|BPF_JA)) {
-				jt = jf = pc->k;
+			if (insns[i].code == (BPF_JMP|BPF_JA)) {
+				jt = jf = insns[i].k;
 			} else {
-				jt = pc->jt;
-				jf = pc->jf;
+				jt = insns[i].jt;
+				jf = insns[i].jf;
 			}
 
 			if (jt >= insn_count - (i + 1) ||
@@ -478,11 +516,13 @@ optimize_pass1(struct bpf_insn *insns,
 			jtf = insn_dat[i].bj_aux.bj_jdata.bj_jtf;
 
 			jtf[0].bj_jump = NULL;
+			jtf[0].bj_length = safe_length;
 			SLIST_INSERT_HEAD(&insn_dat[i + 1 + jt].bj_jumps,
 			    &jtf[0], bj_entries);
 
 			if (jf != jt) {
 				jtf[1].bj_jump = NULL;
+				jtf[1].bj_length = safe_length;
 				SLIST_INSERT_HEAD(&insn_dat[i + 1 + jf].bj_jumps,
 				    &jtf[1], bj_entries);
 			}
@@ -490,96 +530,6 @@ optimize_pass1(struct bpf_insn *insns,
 			continue;
 		}
 	}
-
-	return 0;
-}
-
-/*
- * Walk through all branches and calculate:
- *  (a) a guaranteed minimum length of a packet,
- *  (b) XXX loaded/unloaded flag of all M[k], A and X registers
- * at each intruction i.
- *
- * stack - an array with a size obtained from get_sizes() call.
- */
-static int
-optimize(struct bpf_insn *insns,
-    struct bpfjit_insn_data *insn_dat, size_t insn_count,
-    struct bpfjit_stack_entry stack[])
-{
-	size_t depth;
-	uint32_t length;
-	struct bpf_insn *pc;
-	unsigned int mode;
-	int width;
-
-	if (optimize_pass1(insns, insn_dat, insn_count) != 0)
-		return -1;
-
-	depth = 0;
-	length = 0;
-	for (pc = insns; pc != insns + insn_count; pc++) {
-
-		if (insn_dat[pc - insns].bj_length > length)
-			insn_dat[pc - insns].bj_length = length;
-
-		switch (BPF_CLASS(pc->code)) {
-		default:
-			continue;
-
-		case BPF_LD:
-			if (pc->code == (BPF_LD|BPF_IMM) ||
-			    pc->code == (BPF_LD|BPF_MEM)) {
-			    continue;
-			}
-
-			mode = BPF_MODE(pc->code);
-			if (mode != BPF_ABS && mode != BPF_IND)
-				continue;
-			
-			width = read_width(pc);
-			if (pc->k > UINT32_MAX - width)
-				length = UINT32_MAX;
-			else if (length < pc->k + width)
-				length = pc->k + width;
-
-			continue;
-
-		case BPF_LDX:
-			if (pc->code != (BPF_LDX|BPF_B|BPF_MSH))
-				continue;
-
-			if (pc->k == UINT32_MAX)
-				length = UINT32_MAX;
-			else if (length < pc->k + 1)
-				length = pc->k + 1;
-
-			continue;
-
-		case BPF_JMP:
-			if (pc->code == (BPF_JMP|BPF_JA)) {
-				pc += pc->k;
-			} else if (pc->jt == pc->jf) {
-				pc += pc->jt;
-			} else {
-				stack[depth].bj_insn = pc + pc->jf;
-				stack[depth].bj_length = length;
-				depth++;
-				pc += pc->jt;
-			}
-			continue;
-
-		case BPF_RET:
-			if (depth == 0)
-				break;
-			depth--;
-			pc     = stack[depth].bj_insn;
-			length = stack[depth].bj_length;
-			continue;
-		}
-	}
-
-	assert(depth == 0); /* valid program should end with BPF_RET */
 
 	return 0;
 }
@@ -806,10 +756,6 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	struct sljit_jump **ret0;
 	size_t ret0_size, ret0_maxsize;
 
-	/* stack for optimize() */
-	struct bpfjit_stack_entry *stack;
-	size_t stack_maxsize;
-
 	/*
 	 * minimal guaranteed lengths that don't need to be checked
 	 * XXX
@@ -820,7 +766,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	struct sljit_label *label;
 	struct sljit_jump *jump;
 	struct bpfjit_jump *bjump, *jtf;
-
+	struct bpfjit_read_pkt_data *rdata;
 
 	uint32_t jt, jf;
 
@@ -829,15 +775,13 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	insn_dat = NULL;
 	returns = NULL;
 	ret0 = NULL;
-	stack = NULL;
 
 	opts = bpfjit_optimization_hints(insns, insn_count);
 	minm = opts & 0xff;
 	maxm = (opts >> 8) & 0xff;
 	locals_size = (minm <= maxm) ? (maxm - minm + 1) * sizeof(uint32_t) : 0;
 
-	get_sizes(insns, insn_count, &returns_maxsize, &stack_maxsize);
-
+	returns_maxsize = count_returns(insns, insn_count);
 	if (returns_maxsize  == 0)
 		goto fail;
 
@@ -845,13 +789,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	if (insn_dat == NULL)
 		goto fail;
 
-	if (stack_maxsize > 0) {
-		stack = calloc(stack_maxsize, sizeof(struct bpfjit_stack_entry));
-		if (stack == NULL)
-			goto fail;
-	}
-
-	if (optimize(insns, insn_dat, insn_count, stack) < 0)
+	if (optimize(insns, insn_dat, insn_count) < 0)
 		goto fail;
 
 	ret0_size = 0;
@@ -979,6 +917,10 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			if (mode != BPF_ABS && mode != BPF_IND)
 				goto fail;
 
+			assert(read_pkt_insn(&insns[i], NULL));
+
+			rdata = &insn_dat[i].bj_aux.bj_rdata;
+
 			/*
 			 * BPF_LD+BPF_W+BPF_ABS    A <- P[k:4]
 			 * BPF_LD+BPF_H+BPF_ABS    A <- P[k:2]
@@ -1027,7 +969,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 					goto fail;
 				ret0[ret0_size++] = jump;
 			} else if (mode == BPF_IND ||
-			    pc->k + width > insn_dat[i].bj_length) {
+			    pc->k + width > rdata->bj_length) {
 				/* if (pc->k + width > buflen) return 0; */
 				jump = sljit_emit_cmp(compiler,
 				    SLJIT_C_GREATER,
@@ -1123,36 +1065,36 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			}
 
 			/* BPF_LDX+BPF_B+BPF_MSH    X <- 4*(P[k:1]&0xf) */
-			if (mode == BPF_MSH) {
-				if (BPF_SIZE(pc->code) != BPF_B)
-					goto fail;
+			if (mode != BPF_MSH || BPF_SIZE(pc->code) != BPF_B)
+				goto fail;
 
-				if (pc->k == UINT32_MAX) {
-					/* return 0; */
-					jump = sljit_emit_jump(compiler,
-					    SLJIT_JUMP);
-					if (jump == NULL)
-				  		goto fail;
-				  	ret0[ret0_size++] = jump;
-				} else if (pc->k + 1u > insn_dat[i].bj_length) {
-					/* if (pc->k + 1 > buflen) return 0; */
-					jump = sljit_emit_cmp(compiler,
-					    SLJIT_C_GREATER,
-					    SLJIT_IMM, (uint32_t)pc->k + 1,
-					    BPFJIT_BUFLEN, 0);
-					if (jump == NULL)
-				  		goto fail;
-				  	ret0[ret0_size++] = jump;
-				}
-			
-				status = emit_msh(compiler, (uint32_t)pc->k);
-				if (status != SLJIT_SUCCESS)
-					goto fail;
+			assert(read_pkt_insn(&insns[i], NULL));
 
-				continue;
+			rdata = &insn_dat[i].bj_aux.bj_rdata;
+
+			if (pc->k == UINT32_MAX) {
+				/* return 0; */
+				jump = sljit_emit_jump(compiler,
+				    SLJIT_JUMP);
+				if (jump == NULL)
+			  		goto fail;
+			  	ret0[ret0_size++] = jump;
+			} else if (pc->k + 1u > rdata->bj_length) {
+				/* if (pc->k + 1 > buflen) return 0; */
+				jump = sljit_emit_cmp(compiler,
+				    SLJIT_C_GREATER,
+				    SLJIT_IMM, (uint32_t)pc->k + 1,
+				    BPFJIT_BUFLEN, 0);
+				if (jump == NULL)
+			  		goto fail;
+			  	ret0[ret0_size++] = jump;
 			}
 
-			goto fail;
+			status = emit_msh(compiler, (uint32_t)pc->k);
+			if (status != SLJIT_SUCCESS)
+				goto fail;
+
+			continue;
 
 		case BPF_ST:
 			if (pc->code != BPF_ST || pc->k < minm || pc->k > maxm)
@@ -1423,9 +1365,6 @@ fail:
 
 	if (ret0 != NULL)
 		free(ret0);
-
-	if (stack != NULL)
-		free(stack);
 
 	return (bpfjit_function_t)rv;
 }
