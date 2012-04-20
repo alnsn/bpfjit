@@ -67,7 +67,7 @@ struct bpfjit_jump
 {
 	struct sljit_jump *bj_jump;
 	SLIST_ENTRY(bpfjit_jump) bj_entries;
-	uint32_t bj_length;
+	uint32_t bj_safe_length;
 };
 
 /*
@@ -89,7 +89,12 @@ struct bpfjit_jump_data
  */
 struct bpfjit_read_pkt_data
 {
-	uint32_t bj_length;
+	/*
+	 * If positive, emit "if (buflen < bj_check_length) return 0".
+	 * We assume that buflen is never equal to UINT32_MAX (otherwise,
+	 * we need a special bool variable to emit unconditional "return 0").
+	 */
+	uint32_t bj_check_length;
 };
 
 struct bpfjit_insn_data
@@ -415,6 +420,7 @@ count_returns(struct bpf_insn *insns, size_t insn_count)
 
 /*
  * Return true if pc is a "read from packet" instruction.
+ * XXX Document length.
  */
 static bool
 read_pkt_insn(struct bpf_insn *pc, uint32_t *length)
@@ -449,17 +455,35 @@ read_pkt_insn(struct bpf_insn *pc, uint32_t *length)
 }
 
 /*
+ * Set bj_check_length for all "read from packet" instructions
+ * in a linear block of instructions [from, to).
+ */
+static void
+set_check_length(struct bpf_insn *insns, struct bpfjit_insn_data *insn_dat,
+    size_t from, size_t to, uint32_t length)
+{
+
+	for (; from < to; from++) {
+		if (read_pkt_insn(&insns[from], NULL)) {
+			insn_dat[from].bj_aux.bj_rdata.bj_check_length = length;
+			length = 0;
+		}
+	}
+}
+
+/*
  * The function divides instructions into linear blocks. A block either
  * don't have BPF_RET and BPF_JMP instructions or one of these instructions
  * is the last instruction in the block. Any jump instruction always points
  * to the first instruction of some block.
- * XXX finish implementation
+ * XXX document length checks
  */
 static int
 optimize(struct bpf_insn *insns,
     struct bpfjit_insn_data *insn_dat, size_t insn_count)
 {
 	size_t i;
+	size_t first_read;
 	bool unreachable;
 	uint32_t jt, jf;
 	uint32_t length, safe_length;
@@ -470,14 +494,21 @@ optimize(struct bpf_insn *insns,
 
 	safe_length = 0;
 	unreachable = false;
+	first_read = SIZE_MAX;
+
 	for (i = 0; i < insn_count; i++) {
 
 		if (!SLIST_EMPTY(&insn_dat[i].bj_jumps)) {
 			unreachable = false;
-			safe_length = UINT32_MAX; // insn_count should work too
+
+			set_check_length(insns, insn_dat,
+			    first_read, i, safe_length);
+			first_read = SIZE_MAX;
+
+			safe_length = UINT32_MAX;
 			SLIST_FOREACH(jmp, &insn_dat[i].bj_jumps, bj_entries) {
-				if (jmp->bj_length < safe_length)
-					safe_length = jmp->bj_length;
+				if (jmp->bj_safe_length < safe_length)
+					safe_length = jmp->bj_safe_length;
 			}
 		}
 
@@ -486,7 +517,8 @@ optimize(struct bpf_insn *insns,
 			continue;
 
 		if (read_pkt_insn(&insns[i], &length)) {
-			insn_dat[i].bj_aux.bj_rdata.bj_length = safe_length;
+			if (first_read == SIZE_MAX)
+				first_read = i;
 			if (length > safe_length)
 				safe_length = length;
 		}
@@ -515,13 +547,13 @@ optimize(struct bpf_insn *insns,
 			jtf = insn_dat[i].bj_aux.bj_jdata.bj_jtf;
 
 			jtf[0].bj_jump = NULL;
-			jtf[0].bj_length = safe_length;
+			jtf[0].bj_safe_length = safe_length;
 			SLIST_INSERT_HEAD(&insn_dat[i + 1 + jt].bj_jumps,
 			    &jtf[0], bj_entries);
 
 			if (jf != jt) {
 				jtf[1].bj_jump = NULL;
-				jtf[1].bj_length = safe_length;
+				jtf[1].bj_safe_length = safe_length;
 				SLIST_INSERT_HEAD(&insn_dat[i + 1 + jf].bj_jumps,
 				    &jtf[1], bj_entries);
 			}
@@ -529,6 +561,8 @@ optimize(struct bpf_insn *insns,
 			continue;
 		}
 	}
+
+	set_check_length(insns, insn_dat, first_read, insn_count, safe_length);
 
 	return 0;
 }
@@ -539,33 +573,31 @@ optimize(struct bpf_insn *insns,
  * insn_dat should be initialized by optimize().
  */
 static size_t
-get_ret0_size(struct bpf_insn *insns, size_t insn_count,
-    struct bpfjit_insn_data *insn_dat)
+get_ret0_size(struct bpf_insn *insns, struct bpfjit_insn_data *insn_dat,
+    size_t insn_count)
 {
 	size_t rv = 0;
-	struct bpf_insn *pc;
+	size_t i;
 
-	for (pc = insns; pc != insns + insn_count; pc++) {
-		switch (BPF_CLASS(pc->code)) {
-		case BPF_LD:
-			if (pc->code != (BPF_LD|BPF_IMM) &&
-			    pc->code != (BPF_LD|BPF_MEM)) {
-				switch (BPF_MODE(pc->code)) {
-				case BPF_ABS: rv += 1; break;
-				case BPF_IND: rv += 2; break;
-				}
-			}
-			continue;
-		case BPF_LDX:
-			if (pc->code == (BPF_LDX|BPF_B|BPF_MSH))
-				rv += 1;
-			continue;
-		case BPF_ALU:
-			if (pc->code == (BPF_ALU|BPF_DIV|BPF_X))
-				rv += 1;
-			if (pc->code == (BPF_ALU|BPF_DIV|BPF_K) && pc->k == 0)
-				rv += 1;
-			continue;
+	for (i = 0; i < insn_count; i++) {
+
+		if (read_pkt_insn(&insns[i], NULL) &&
+		    insn_dat[i].bj_aux.bj_rdata.bj_check_length > 0) {
+			rv++;
+		}
+
+		if (insns[i].code == (BPF_LD|BPF_IND|BPF_B) ||
+		    insns[i].code == (BPF_LD|BPF_IND|BPF_H) ||
+		    insns[i].code == (BPF_LD|BPF_IND|BPF_W)) {
+			rv++;
+		}
+
+		if (insns[i].code == (BPF_ALU|BPF_DIV|BPF_X))
+			rv++;
+
+		if (insns[i].code == (BPF_ALU|BPF_DIV|BPF_K) &&
+		    insns[i].k == 0) {
+			rv++;
 		}
 	}
 
@@ -765,7 +797,6 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	struct sljit_label *label;
 	struct sljit_jump *jump;
 	struct bpfjit_jump *bjump, *jtf;
-	struct bpfjit_read_pkt_data *rdata;
 
 	uint32_t jt, jf;
 
@@ -792,7 +823,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 		goto fail;
 
 	ret0_size = 0;
-	ret0_maxsize = get_ret0_size(insns, insn_count, insn_dat);
+	ret0_maxsize = get_ret0_size(insns, insn_dat, insn_count);
 	if (ret0_maxsize > 0) {
 		ret0 = calloc(ret0_maxsize, sizeof(ret0[0]));
 		if (ret0 == NULL)
@@ -863,9 +894,19 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			}
 		}
 
-		/*
-		 * Command dispatcher.
-		 */
+		if (read_pkt_insn(&insns[i], NULL) &&
+		    insn_dat[i].bj_aux.bj_rdata.bj_check_length > 0) {
+			/* if (buflen < bj_check_length) return 0; */
+			jump = sljit_emit_cmp(compiler,
+			    SLJIT_C_LESS,
+			    BPFJIT_BUFLEN, 0,
+			    SLJIT_IMM,
+			    insn_dat[i].bj_aux.bj_rdata.bj_check_length);
+			if (jump == NULL)
+		  		goto fail;
+		  	ret0[ret0_size++] = jump;
+		}
+
 		pc = &insns[i];
 		switch (BPF_CLASS(pc->code)) {
 
@@ -916,10 +957,6 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			if (mode != BPF_ABS && mode != BPF_IND)
 				goto fail;
 
-			assert(read_pkt_insn(&insns[i], NULL));
-
-			rdata = &insn_dat[i].bj_aux.bj_rdata;
-
 			/*
 			 * BPF_LD+BPF_W+BPF_ABS    A <- P[k:4]
 			 * BPF_LD+BPF_H+BPF_ABS    A <- P[k:2]
@@ -929,17 +966,19 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			 * BPF_LD+BPF_B+BPF_IND    A <- P[X+k:1]
 			 */
 
-			if (mode == BPF_IND) {
-				/* if (X > buflen) return 0; */
-				jump = sljit_emit_cmp(compiler,
-				    SLJIT_C_GREATER,
-				    BPFJIT_X, 0,
-				    BPFJIT_BUFLEN, 0);
-				if (jump == NULL)
-					goto fail;
-				ret0[ret0_size++] = jump;
+			width = read_width(pc);
 
-				/* temporarily do buf += X; buflen -= X; */
+			if (mode == BPF_IND) {
+				/* buflen -= pc->k + width; */
+				status = sljit_emit_op2(compiler,
+				    SLJIT_SUB,
+				    BPFJIT_BUFLEN, 0,
+				    BPFJIT_BUFLEN, 0,
+				    SLJIT_IMM, pc->k + width);
+				if (status != SLJIT_SUCCESS)
+					goto fail;
+
+				/* buf += X; */
 				status = sljit_emit_op2(compiler,
 				    SLJIT_ADD,
 				    BPFJIT_BUF, 0,
@@ -948,33 +987,23 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				if (status != SLJIT_SUCCESS)
 					goto fail;
 
-				status = sljit_emit_op2(compiler,
-				    SLJIT_SUB,
-				    BPFJIT_BUFLEN, 0,
+				/* if (buflen < X) return 0; */
+				jump = sljit_emit_cmp(compiler,
+				    SLJIT_C_LESS,
 				    BPFJIT_BUFLEN, 0,
 				    BPFJIT_X, 0);
+				if (jump == NULL)
+					goto fail;
+				ret0[ret0_size++] = jump;
+
+				/* buflen += pc->k + width; */
+				status = sljit_emit_op2(compiler,
+				    SLJIT_ADD,
+				    BPFJIT_BUFLEN, 0,
+				    BPFJIT_BUFLEN, 0,
+				    SLJIT_IMM, pc->k + width);
 				if (status != SLJIT_SUCCESS)
 					goto fail;
-			}
-
-			width = read_width(pc);
-
-			if (pc->k > UINT32_MAX - width) {
-				/* return 0; */
-				jump = sljit_emit_jump(compiler, SLJIT_JUMP);
-				if (jump == NULL)
-					goto fail;
-				ret0[ret0_size++] = jump;
-			} else if (mode == BPF_IND ||
-			    pc->k + width > rdata->bj_length) {
-				/* if (pc->k + width > buflen) return 0; */
-				jump = sljit_emit_cmp(compiler,
-				    SLJIT_C_GREATER,
-				    SLJIT_IMM, (uint32_t)pc->k + width,
-				    BPFJIT_BUFLEN, 0);
-				if (jump == NULL)
-					goto fail;
-				ret0[ret0_size++] = jump;
 			}
 
 			switch (width) {
@@ -992,20 +1021,12 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			if (status != SLJIT_SUCCESS)
 				goto fail;
 
-			/* restore buf and buflen values: buf -= X; buflen += X; */
 			if (mode == BPF_IND) {
+				/* buf -= X; */
 				status = sljit_emit_op2(compiler,
 				    SLJIT_SUB,
 				    BPFJIT_BUF, 0,
 				    BPFJIT_BUF, 0,
-				    BPFJIT_X, 0);
-				if (status != SLJIT_SUCCESS)
-					goto fail;
-
-				status = sljit_emit_op2(compiler,
-				    SLJIT_ADD,
-				    BPFJIT_BUFLEN, 0,
-				    BPFJIT_BUFLEN, 0,
 				    BPFJIT_X, 0);
 				if (status != SLJIT_SUCCESS)
 					goto fail;
@@ -1064,28 +1085,6 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			/* BPF_LDX+BPF_B+BPF_MSH    X <- 4*(P[k:1]&0xf) */
 			if (mode != BPF_MSH || BPF_SIZE(pc->code) != BPF_B)
 				goto fail;
-
-			assert(read_pkt_insn(&insns[i], NULL));
-
-			rdata = &insn_dat[i].bj_aux.bj_rdata;
-
-			if (pc->k == UINT32_MAX) {
-				/* return 0; */
-				jump = sljit_emit_jump(compiler,
-				    SLJIT_JUMP);
-				if (jump == NULL)
-			  		goto fail;
-			  	ret0[ret0_size++] = jump;
-			} else if (pc->k + 1u > rdata->bj_length) {
-				/* if (pc->k + 1 > buflen) return 0; */
-				jump = sljit_emit_cmp(compiler,
-				    SLJIT_C_GREATER,
-				    SLJIT_IMM, (uint32_t)pc->k + 1,
-				    BPFJIT_BUFLEN, 0);
-				if (jump == NULL)
-			  		goto fail;
-			  	ret0[ret0_size++] = jump;
-			}
 
 			status = emit_msh(compiler, (uint32_t)pc->k);
 			if (status != SLJIT_SUCCESS)
@@ -1309,7 +1308,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 		} /* switch */
 	} /* main loop */
 
-	assert(ret0_size <= ret0_maxsize); /* XXX make it == again */
+	assert(ret0_size == ret0_maxsize);
 	assert(returns_size <= returns_maxsize);
 
 	if (returns_size > 0) {
