@@ -64,21 +64,6 @@ static struct bpf_insn insns[] = {
 	BPF_STMT(BPF_RET+BPF_K, 0)
 };
 
-/* Optimize away two length checks (@26 and @12): */
-static struct bpf_insn insns_opt[] = {
-	BPF_STMT(BPF_LD+BPF_W+BPF_ABS, 30),
-	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x80037023, 0, 2),
-	BPF_STMT(BPF_LD+BPF_W+BPF_ABS, 26),
-	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x8003700f, 3, 6),
-	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x8003700f, 0, 5),
-	BPF_STMT(BPF_LD+BPF_W+BPF_ABS, 26),
-	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x80037023, 0, 3),
-	BPF_STMT(BPF_LD+BPF_H+BPF_ABS, 12),
-	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, 0x800, 0, 1),
-	BPF_STMT(BPF_RET+BPF_K, UINT32_MAX),
-	BPF_STMT(BPF_RET+BPF_K, 0)
-};
-
 static uint8_t test_pkt[128] = {
 	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0x08, 0x00,
 	14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
@@ -121,18 +106,6 @@ test_bpfjit(size_t counter, const uint8_t *pkt,
 	bpfjit_free_code(code);
 }
 
-static void
-test_bpfjit_opt(size_t counter, const uint8_t *pkt,
-    unsigned int pktsize, size_t dummy)
-{
-	bpfjit_function_t code;
-
-	code = bpfjit_generate_code(insns_opt,
-	    sizeof(insns_opt) / sizeof(insns_opt[0]));
-	test_fun(code, pkt, pktsize, counter, dummy, "bpfjit code (optimized)");
-	bpfjit_free_code(code);
-}
-
 void
 test_bpf_filter(size_t counter, size_t dummy)
 {
@@ -156,7 +129,6 @@ void usage(const char *prog)
 	    " -b  - run bpf_filter\n"
 	    " -c  - run C code\n"
 	    " -j  - run bpfjit code\n"
-	    " -J  - same as above but use an optimized filter program\n"
 	    " NNN - number of iterations\n", prog);
 }
 
@@ -182,15 +154,9 @@ int main(int argc, char* argv[])
 	if (!bpf_validate(insns, sizeof(insns) / sizeof(insns[0])))
 		errx(EXIT_FAILURE, "Not valid bpf program");
 
-	if (!bpf_validate(insns_opt, sizeof(insns_opt) / sizeof(insns_opt[0])))
-		errx(EXIT_FAILURE, "Not valid bpf program");
-
 	switch (cmd) {
 	case 'j':
 		test_bpfjit(counter, test_pkt, sizeof(test_pkt), dummy);
-		break;
-	case 'J':
-		test_bpfjit_opt(counter, test_pkt, sizeof(test_pkt), dummy);
 		break;
 	case 'b':
 		test_bpf_filter(counter, dummy);
