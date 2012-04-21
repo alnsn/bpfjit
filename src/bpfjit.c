@@ -969,10 +969,10 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			width = read_width(pc);
 
 			if (mode == BPF_IND) {
-				/* buflen -= pc->k + width; */
+				/* tmp1 = buflen - (pc->k + width); */
 				status = sljit_emit_op2(compiler,
 				    SLJIT_SUB,
-				    BPFJIT_BUFLEN, 0,
+				    BPFJIT_TMP1, 0,
 				    BPFJIT_BUFLEN, 0,
 				    SLJIT_IMM, pc->k + width);
 				if (status != SLJIT_SUCCESS)
@@ -987,23 +987,14 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				if (status != SLJIT_SUCCESS)
 					goto fail;
 
-				/* if (buflen < X) return 0; */
+				/* if (tmp1 < X) return 0; */
 				jump = sljit_emit_cmp(compiler,
 				    SLJIT_C_LESS,
-				    BPFJIT_BUFLEN, 0,
+				    BPFJIT_TMP1, 0,
 				    BPFJIT_X, 0);
 				if (jump == NULL)
 					goto fail;
 				ret0[ret0_size++] = jump;
-
-				/* buflen += pc->k + width; */
-				status = sljit_emit_op2(compiler,
-				    SLJIT_ADD,
-				    BPFJIT_BUFLEN, 0,
-				    BPFJIT_BUFLEN, 0,
-				    SLJIT_IMM, pc->k + width);
-				if (status != SLJIT_SUCCESS)
-					goto fail;
 			}
 
 			switch (width) {
