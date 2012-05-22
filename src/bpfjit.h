@@ -30,11 +30,14 @@
 #ifndef _NET_BPFJIT_H_
 #define _NET_BPFJIT_H_
 
+#ifndef _KERNEL
 #include <stddef.h>
+#include <stdint.h>
+#endif
+
+#include <sys/types.h>
 
 #ifdef __linux
-#include <stdint.h>
-#include <sys/types.h>
 #include <pcap-bpf.h>
 #else
 #include <net/bpf.h>

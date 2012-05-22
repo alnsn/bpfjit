@@ -29,16 +29,38 @@
 
 #include "bpfjit.h"
 
+#ifndef _KERNEL
 #include <assert.h>
+#define BPFJIT_ASSERT(c) assert(c)
+#else
+#define BPFJIT_ASSERT(c) KASSERT(c)
+#endif
+
+#ifndef _KERNEL
+#include <stdlib.h>
+#define BPFJIT_MALLOC(sz) malloc(sz)
+#define BPFJIT_FREE(p) free(p)
+#else
+#include <sys/malloc.h>
+#define BPFJIT_MALLOC(sz) kern_malloc(sz, M_WAITOK)
+#define BPFJIT_FREE(p) kern_free(p)
+#endif
+
+#ifndef _KERNEL
 #include <limits.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdlib.h>
+#else
+#include <machine/limits.h>
+#include <sys/null.h>
+#include <sys/types.h>
+#endif
+
 #include <sys/queue.h>
 #include <sys/types.h>
 
-#if defined(SLJIT_VERBOSE) && SLJIT_VERBOSE
+#if !defined(_KERNEL) && defined(SLJIT_VERBOSE) && SLJIT_VERBOSE
 #include <stdio.h> /* for stderr */
 #endif
 
@@ -97,6 +119,9 @@ struct bpfjit_read_pkt_data
 	uint32_t bj_check_length;
 };
 
+/*
+ * Additional (optimization-related) data for bpf_insn.
+ */
 struct bpfjit_insn_data
 {
 	/* List of jumps to this insn. */
@@ -123,7 +148,8 @@ read_width(struct bpf_insn *pc)
 	case BPF_B:
 		return 1;
 	default:
-		assert(false);
+		BPFJIT_ASSERT(false);
+		return 0;
 	}
 }
 
@@ -317,7 +343,7 @@ emit_pow2_division(struct sljit_compiler* compiler, uint32_t k)
 		shift++;
 	}
 
-	assert(k == 1 && shift < 32);
+	BPFJIT_ASSERT(k == 1 && shift < 32);
 
 	if (shift != 0) {
 		status = sljit_emit_op2(compiler,
@@ -420,7 +446,8 @@ count_returns(struct bpf_insn *insns, size_t insn_count)
 
 /*
  * Return true if pc is a "read from packet" instruction.
- * XXX Document length.
+ * If length is not NULL and return value is true, *length will
+ * be set to a safe length required to read a packet.
  */
 static bool
 read_pkt_insn(struct bpf_insn *pc, uint32_t *length)
@@ -472,11 +499,15 @@ set_check_length(struct bpf_insn *insns, struct bpfjit_insn_data *insn_dat,
 }
 
 /*
- * The function divides instructions into linear blocks. A block either
- * don't have BPF_RET and BPF_JMP instructions or one of these instructions
- * is the last instruction in the block. Any jump instruction always points
- * to the first instruction of some block.
- * XXX document length checks
+ * The function divides instructions into blocks. Destination of a jump
+ * instruction starts a new block. BPF_RET and BPF_JMP instructions
+ * terminate a block. Blocks are linear, that is, there are no jumps out
+ * from the middle of a block and there are no jumps in to the middle of
+ * a block.
+ * If a block has one or more "read from packet" instructions,
+ * bj_check_length will be set to one value for the whole block and that
+ * value will be equal to the greatest value of safe lengths of "read from
+ * packet" instructions inside the block.
  */
 static int
 optimize(struct bpf_insn *insns,
@@ -624,7 +655,8 @@ bpf_alu_to_sljit_op(struct bpf_insn *pc)
 	case BPF_LSH: return SLJIT_SHL;
 	case BPF_RSH: return SLJIT_LSHR|SLJIT_INT_OP;
 	default:
-		assert(false);
+		BPFJIT_ASSERT(false);
+		return 0;
 	}
 }
 
@@ -654,7 +686,7 @@ bpf_jmp_to_sljit_cond(struct bpf_insn *pc, bool negate)
 		rv |= negate ? SLJIT_C_EQUAL : SLJIT_C_NOT_EQUAL;
 		break;
 	default:
-		assert(false);
+		BPFJIT_ASSERT(false);
 	}
 
 	return rv;
@@ -667,7 +699,7 @@ bpfjit_optimization_hints(struct bpf_insn *insns, size_t insn_count)
 	struct bpf_insn *pc;
 	int minm, maxm;
 
-	assert(BPF_MEMWORDS - 1 <= 0xff);
+	BPFJIT_ASSERT(BPF_MEMWORDS - 1 <= 0xff);
 
 	maxm = 0;
 	minm = BPF_MEMWORDS - 1;
@@ -678,7 +710,7 @@ bpfjit_optimization_hints(struct bpf_insn *insns, size_t insn_count)
 			if (BPF_MODE(pc->code) == BPF_IND)
 				rv |= BPFJIT_INIT_X;
 			if (BPF_MODE(pc->code) == BPF_MEM &&
-			    pc->k >= 0 && pc->k < BPF_MEMWORDS) {
+			    (uint32_t)pc->k < BPF_MEMWORDS) {
 				if (pc->k > maxm)
 					maxm = pc->k;
 				if (pc->k < minm)
@@ -688,7 +720,7 @@ bpfjit_optimization_hints(struct bpf_insn *insns, size_t insn_count)
 		case BPF_LDX:
 			rv |= BPFJIT_INIT_X;
 			if (BPF_MODE(pc->code) == BPF_MEM &&
-			    pc->k >= 0 && pc->k < BPF_MEMWORDS) {
+			    (uint32_t)pc->k < BPF_MEMWORDS) {
 				if (pc->k > maxm)
 					maxm = pc->k;
 				if (pc->k < minm)
@@ -696,7 +728,7 @@ bpfjit_optimization_hints(struct bpf_insn *insns, size_t insn_count)
 			}
 			continue;
 		case BPF_ST:
-			if (pc->k >= 0 && pc->k < BPF_MEMWORDS) {
+			if ((uint32_t)pc->k < BPF_MEMWORDS) {
 				if (pc->k > maxm)
 					maxm = pc->k;
 				if (pc->k < minm)
@@ -705,7 +737,7 @@ bpfjit_optimization_hints(struct bpf_insn *insns, size_t insn_count)
 			continue;
 		case BPF_STX:
 			rv |= BPFJIT_INIT_X;
-			if (pc->k >= 0 && pc->k < BPF_MEMWORDS) {
+			if ((uint32_t)pc->k < BPF_MEMWORDS) {
 				if (pc->k > maxm)
 					maxm = pc->k;
 				if (pc->k < minm)
@@ -730,7 +762,7 @@ bpfjit_optimization_hints(struct bpf_insn *insns, size_t insn_count)
 			rv |= BPFJIT_INIT_X;
 			continue;
 		default:
-			assert(false);
+			BPFJIT_ASSERT(false);
 		}
 	}
 
@@ -748,7 +780,8 @@ kx_to_reg(struct bpf_insn *pc)
 	case BPF_K: return SLJIT_IMM;
 	case BPF_X: return BPFJIT_X;
 	default:
-		assert(false);
+		BPFJIT_ASSERT(false);
+		return 0;
 	}
 }
 
@@ -760,7 +793,8 @@ kx_to_reg_arg(struct bpf_insn *pc)
 	case BPF_K: return (uint32_t)pc->k; /* SLJIT_IMM, pc->k, */
 	case BPF_X: return 0;               /* BPFJIT_X, 0,      */
 	default:
-		assert(false);
+		BPFJIT_ASSERT(false);
+		return 0;
 	}
 }
 
@@ -787,10 +821,6 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	struct sljit_jump **ret0;
 	size_t ret0_size, ret0_maxsize;
 
-	/*
-	 * minimal guaranteed lengths that don't need to be checked
-	 * XXX
-	 */
 	struct bpfjit_insn_data *insn_dat;
 
 	/* for local use */
@@ -815,7 +845,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	if (returns_maxsize  == 0)
 		goto fail;
 
-	insn_dat = calloc(insn_count, sizeof(insn_dat[0]));
+	insn_dat = BPFJIT_MALLOC(insn_count * sizeof(insn_dat[0]));
 	if (insn_dat == NULL)
 		goto fail;
 
@@ -825,13 +855,13 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	ret0_size = 0;
 	ret0_maxsize = get_ret0_size(insns, insn_dat, insn_count);
 	if (ret0_maxsize > 0) {
-		ret0 = calloc(ret0_maxsize, sizeof(ret0[0]));
+		ret0 = BPFJIT_MALLOC(ret0_maxsize * sizeof(ret0[0]));
 		if (ret0 == NULL)
 			goto fail;
 	}
 
 	returns_size = 0;
-	returns = calloc(returns_maxsize, sizeof(returns[0]));
+	returns = BPFJIT_MALLOC(returns_maxsize * sizeof(returns[0]));
 	if (returns == NULL)
 		goto fail;
 
@@ -1213,7 +1243,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				if (jump == NULL)
 					goto fail;
 
-				assert(jtf[negate].bj_jump == NULL);
+				BPFJIT_ASSERT(jtf[negate].bj_jump == NULL);
 				jtf[negate].bj_jump = jump;
 			}
 
@@ -1222,7 +1252,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				if (jump == NULL)
 					goto fail;
 
-				assert(jtf[branching].bj_jump == NULL);
+				BPFJIT_ASSERT(jtf[branching].bj_jump == NULL);
 				jtf[branching].bj_jump = jump;
 			}
 
@@ -1299,8 +1329,8 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 		} /* switch */
 	} /* main loop */
 
-	assert(ret0_size == ret0_maxsize);
-	assert(returns_size <= returns_maxsize);
+	BPFJIT_ASSERT(ret0_size == ret0_maxsize);
+	BPFJIT_ASSERT(returns_size <= returns_maxsize);
 
 	if (returns_size > 0) {
 		label = sljit_emit_label(compiler);
@@ -1345,13 +1375,13 @@ fail:
 		sljit_free_compiler(compiler);
 
 	if (insn_dat != NULL)
-		free(insn_dat);
+		BPFJIT_FREE(insn_dat);
 
 	if (returns != NULL)
-		free(returns);
+		BPFJIT_FREE(returns);
 
 	if (ret0 != NULL)
-		free(ret0);
+		BPFJIT_FREE(ret0);
 
 	return (bpfjit_function_t)rv;
 }
