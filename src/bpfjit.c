@@ -60,11 +60,11 @@
 #include <sys/queue.h>
 #include <sys/types.h>
 
+#include <sljitLir.h>
+
 #if !defined(_KERNEL) && defined(SLJIT_VERBOSE) && SLJIT_VERBOSE
 #include <stdio.h> /* for stderr */
 #endif
-
-#include <sljitLir.h>
 
 
 #define BPFJIT_A	SLJIT_TEMPORARY_REG1
@@ -869,7 +869,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	if (compiler == NULL)
 		goto fail;
 
-#if defined(SLJIT_VERBOSE) && SLJIT_VERBOSE
+#if !defined(_KERNEL) && defined(SLJIT_VERBOSE) && SLJIT_VERBOSE
 	sljit_compiler_verbose(compiler, stderr);
 #endif
 
