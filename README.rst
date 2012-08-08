@@ -24,7 +24,7 @@ Extract sljit tarball to sljit/ subdirectory. Make sure you pass
 
 	$ cd sljit/
 
-	$ tar ktf /path/to/sljit-r154.tar
+	$ tar kxf /path/to/sljit-r154.tar
 
 Then you can build bpfjit with this command
 
