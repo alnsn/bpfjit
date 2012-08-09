@@ -453,6 +453,146 @@ emit_xcall(struct sljit_compiler* compiler, struct bpf_insn *pc,
 #endif
 
 /*
+ * Generate code for
+ * BPF_LD+BPF_W+BPF_ABS    A <- P[k:4]
+ * BPF_LD+BPF_H+BPF_ABS    A <- P[k:2]
+ * BPF_LD+BPF_B+BPF_ABS    A <- P[k:1]
+ * BPF_LD+BPF_W+BPF_IND    A <- P[X+k:4]
+ * BPF_LD+BPF_H+BPF_IND    A <- P[X+k:2]
+ * BPF_LD+BPF_B+BPF_IND    A <- P[X+k:1]
+ */
+static int
+emit_pkt_read(struct sljit_compiler* compiler,
+    struct bpf_insn *pc, struct sljit_jump *to_mchain_jump,
+    struct sljit_jump **ret0, size_t *ret0_size)
+{
+	int status;
+	uint32_t width;
+	struct sljit_jump *jump;
+#ifdef _KERNEL
+	struct sljit_label *label;
+	struct sljit_jump *over_mchain_jump;
+	const bool check_zero_buflen = (to_mchain_jump != NULL);
+#endif
+	const uint32_t k = pc->k;
+
+#ifdef _KERNEL
+	if (to_mchain_jump == NULL) {
+		to_mchain_jump = sljit_emit_cmp(compiler,
+		    SLJIT_C_EQUAL,
+		    BPFJIT_BUFLEN, 0,
+		    SLJIT_IMM, 0);
+		if (to_mchain_jump == NULL)
+  			return SLJIT_ERR_ALLOC_FAILED;
+	}
+#endif
+
+	width = read_width(pc);
+
+	if (BPF_MODE(pc->code) == BPF_IND) {
+		/* tmp1 = buflen - (pc->k + width); */
+		status = sljit_emit_op2(compiler,
+		    SLJIT_SUB,
+		    BPFJIT_TMP1, 0,
+		    BPFJIT_BUFLEN, 0,
+		    SLJIT_IMM, k + width);
+		if (status != SLJIT_SUCCESS)
+			return status;
+
+		/* buf += X; */
+		status = sljit_emit_op2(compiler,
+		    SLJIT_ADD,
+		    BPFJIT_BUF, 0,
+		    BPFJIT_BUF, 0,
+		    BPFJIT_X, 0);
+		if (status != SLJIT_SUCCESS)
+			return status;
+
+		/* if (tmp1 < X) return 0; */
+		jump = sljit_emit_cmp(compiler,
+		    SLJIT_C_LESS,
+		    BPFJIT_TMP1, 0,
+		    BPFJIT_X, 0);
+		if (jump == NULL)
+  			return SLJIT_ERR_ALLOC_FAILED;
+		ret0[(*ret0_size)++] = jump;
+	}
+
+	switch (width) {
+	case 4:
+		status = emit_read32(compiler, k);
+		break;
+	case 2:
+		status = emit_read16(compiler, k);
+		break;
+	case 1:
+		status = emit_read8(compiler, k);
+		break;
+	}
+
+	if (status != SLJIT_SUCCESS)
+		return status;
+
+	if (BPF_MODE(pc->code) == BPF_IND) {
+		/* buf -= X; */
+		status = sljit_emit_op2(compiler,
+		    SLJIT_SUB,
+		    BPFJIT_BUF, 0,
+		    BPFJIT_BUF, 0,
+		    BPFJIT_X, 0);
+		if (status != SLJIT_SUCCESS)
+			return status;
+	}
+
+#ifdef _KERNEL
+	over_mchain_jump = sljit_emit_jump(compiler, SLJIT_JUMP);
+	if (over_mchain_jump == NULL)
+  		return SLJIT_ERR_ALLOC_FAILED;
+
+	/* entry point to mchain handler */
+	label = sljit_emit_label(compiler);
+	if (label == NULL)
+  		return SLJIT_ERR_ALLOC_FAILED;
+	sljit_set_label(to_mchain_jump, label);
+
+	if (check_zero_buflen) {
+		/* if (buflen != 0) return 0; */
+		jump = sljit_emit_cmp(compiler,
+		    SLJIT_C_NOT_EQUAL,
+		    BPFJIT_BUFLEN, 0,
+		    SLJIT_IMM, 0);
+		if (jump == NULL)
+			return SLJIT_ERR_ALLOC_FAILED;
+		ret0[(*ret0_size)++] = jump;
+	}
+
+	switch (width) {
+	case 4:
+		status = emit_xcall(compiler, pc, BPFJIT_A, 0, &jump, &m_xword);
+		break;
+	case 2:
+		status = emit_xcall(compiler, pc, BPFJIT_A, 0, &jump, &m_xhalf);
+		break;
+	case 1:
+		status = emit_xcall(compiler, pc, BPFJIT_A, 0, &jump, &m_xbyte);
+		break;
+	}
+
+	if (status != SLJIT_SUCCESS)
+		return status;
+
+	ret0[(*ret0_size)++] = jump;
+
+	label = sljit_emit_label(compiler);
+	if (label == NULL)
+		return SLJIT_ERR_ALLOC_FAILED;
+	sljit_set_label(over_mchain_jump, label);
+#endif
+
+	return status;
+}
+
+/*
  * Generate code for BPF_LDX+BPF_B+BPF_MSH    X <- 4*(P[k:1]&0xf).
  */
 static int
@@ -1035,7 +1175,6 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	void *rv;
 	size_t i;
 	int status;
-	uint32_t width;
 	int branching, negate;
 	unsigned int rval, mode, src;
 	int ntmp;
@@ -1062,9 +1201,6 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	struct bpfjit_jump *bjump, *jtf;
 
 	struct sljit_jump *to_mchain_jump;
-#ifdef _KERNEL
-	struct sljit_jump *over_mchain_jump;
-#endif
 
 	uint32_t jt, jf;
 
@@ -1238,128 +1374,10 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			if (mode != BPF_ABS && mode != BPF_IND)
 				goto fail;
 
-			/*
-			 * BPF_LD+BPF_W+BPF_ABS    A <- P[k:4]
-			 * BPF_LD+BPF_H+BPF_ABS    A <- P[k:2]
-			 * BPF_LD+BPF_B+BPF_ABS    A <- P[k:1]
-			 * BPF_LD+BPF_W+BPF_IND    A <- P[X+k:4]
-			 * BPF_LD+BPF_H+BPF_IND    A <- P[X+k:2]
-			 * BPF_LD+BPF_B+BPF_IND    A <- P[X+k:1]
-			 */
-
-#ifdef _KERNEL
-			if (to_mchain_jump == NULL) {
-				to_mchain_jump = sljit_emit_cmp(compiler,
-				    SLJIT_C_EQUAL,
-				    BPFJIT_BUFLEN, 0,
-				    SLJIT_IMM, 0);
-				if (to_mchain_jump == NULL)
-		  			goto fail;
-			}
-#endif
-
-			width = read_width(pc);
-
-			if (mode == BPF_IND) {
-				/* tmp1 = buflen - (pc->k + width); */
-				status = sljit_emit_op2(compiler,
-				    SLJIT_SUB,
-				    BPFJIT_TMP1, 0,
-				    BPFJIT_BUFLEN, 0,
-				    SLJIT_IMM, (uint32_t)pc->k + width);
-				if (status != SLJIT_SUCCESS)
-					goto fail;
-
-				/* buf += X; */
-				status = sljit_emit_op2(compiler,
-				    SLJIT_ADD,
-				    BPFJIT_BUF, 0,
-				    BPFJIT_BUF, 0,
-				    BPFJIT_X, 0);
-				if (status != SLJIT_SUCCESS)
-					goto fail;
-
-				/* if (tmp1 < X) return 0; */
-				jump = sljit_emit_cmp(compiler,
-				    SLJIT_C_LESS,
-				    BPFJIT_TMP1, 0,
-				    BPFJIT_X, 0);
-				if (jump == NULL)
-					goto fail;
-				ret0[ret0_size++] = jump;
-			}
-
-			switch (width) {
-			case 4:
-				status = emit_read32(compiler, (uint32_t)pc->k);
-				break;
-			case 2:
-				status = emit_read16(compiler, (uint32_t)pc->k);
-				break;
-			case 1:
-				status = emit_read8(compiler, (uint32_t)pc->k);
-				break;
-			}
-
+			status = emit_pkt_read(compiler, pc,
+			    to_mchain_jump, ret0, &ret0_size);
 			if (status != SLJIT_SUCCESS)
 				goto fail;
-
-			if (mode == BPF_IND) {
-				/* buf -= X; */
-				status = sljit_emit_op2(compiler,
-				    SLJIT_SUB,
-				    BPFJIT_BUF, 0,
-				    BPFJIT_BUF, 0,
-				    BPFJIT_X, 0);
-				if (status != SLJIT_SUCCESS)
-					goto fail;
-			}
-
-#ifdef _KERNEL
-			over_mchain_jump = sljit_emit_jump(compiler, SLJIT_JUMP);
-			if (over_mchain_jump == NULL)
-				goto fail;
-
-			/* entry point to mchain handler */
-			label = sljit_emit_label(compiler);
-			if (label == NULL)
-				goto fail;
-			sljit_set_label(to_mchain_jump, label);
-
-			/* XXX Use check_zero_buflen in refactored code */
-			if (insn_dat[i].bj_aux.bj_rdata.bj_check_length > 0) {
-				/* if (buflen != 0) return 0; */
-				jump = sljit_emit_cmp(compiler,
-				    SLJIT_C_NOT_EQUAL,
-				    BPFJIT_BUFLEN, 0,
-				    SLJIT_IMM, 0);
-				if (jump == NULL)
-		  			goto fail;
-				ret0[ret0_size++] = jump;
-			}
-
-			switch (width) {
-			case 4:
-				status = emit_xcall(compiler, pc, BPFJIT_A, 0, &jump, &m_xword);
-				break;
-			case 2:
-				status = emit_xcall(compiler, pc, BPFJIT_A, 0, &jump, &m_xhalf);
-				break;
-			case 1:
-				status = emit_xcall(compiler, pc, BPFJIT_A, 0, &jump, &m_xbyte);
-				break;
-			}
-
-			if (status != SLJIT_SUCCESS)
-				goto fail;
-
-			ret0[ret0_size++] = jump;
-
-			label = sljit_emit_label(compiler);
-			if (label == NULL)
-				goto fail;
-			sljit_set_label(over_mchain_jump, label);
-#endif
 
 			continue;
 
