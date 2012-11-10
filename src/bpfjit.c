@@ -137,9 +137,9 @@ struct bpfjit_insn_data
 };
 
 #ifdef _KERNEL
-int m_xword(const struct mbuf *, uint32_t, int *);
-int m_xhalf(const struct mbuf *, uint32_t, int *);
-int m_xbyte(const struct mbuf *, uint32_t, int *);
+uint32_t m_xword(const struct mbuf *, uint32_t, int *);
+uint32_t m_xhalf(const struct mbuf *, uint32_t, int *);
+uint32_t m_xbyte(const struct mbuf *, uint32_t, int *);
 #endif
 
 static uint32_t
@@ -162,10 +162,10 @@ read_width(struct bpf_insn *pc)
 /*
  * Get offset of M[k] on the stack.
  */
-static int
-mem_local_offset(uint32_t k, int minm)
+static size_t
+mem_local_offset(uint32_t k, unsigned int minm)
 {
-	int moff = (k - minm) * sizeof(uint32_t);
+	size_t moff = (k - minm) * sizeof(uint32_t);
 
 #ifdef _KERNEL
 	/*
@@ -345,7 +345,7 @@ emit_read32(struct sljit_compiler* compiler, uint32_t k)
 static int
 emit_xcall(struct sljit_compiler* compiler, struct bpf_insn *pc,
     int dst, sljit_w dstw, struct sljit_jump **ret0_jump,
-    int (*fn)(const struct mbuf *, uint32_t, int *))
+    uint32_t (*fn)(const struct mbuf *, uint32_t, int *))
 {
 #if BPFJIT_X != SLJIT_TEMPORARY_EREG1 || \
     BPFJIT_X == SLJIT_RETURN_REG
@@ -404,22 +404,6 @@ emit_xcall(struct sljit_compiler* compiler, struct bpf_insn *pc,
 	    SLJIT_CALL3,
 	    SLJIT_IMM, SLJIT_FUNC_OFFSET(fn));
 
-	/* tmp3 = *err; */
-	status = sljit_emit_op1(compiler,
-	    SLJIT_MOV_UI,
-	    SLJIT_TEMPORARY_REG3, 0,
-	    SLJIT_MEM1(SLJIT_LOCALS_REG), arg3_offset);
-	if (status != SLJIT_SUCCESS)
-		return status;
-
-	/* if (tmp3 != 0) return 0; */
-	*ret0_jump = sljit_emit_cmp(compiler,
-	    SLJIT_C_NOT_EQUAL,
-	    SLJIT_TEMPORARY_REG3, 0,
-	    SLJIT_IMM, 0);
-	if (*ret0_jump == NULL)
-		return SLJIT_ERR_ALLOC_FAILED;
-
 	if (BPF_CLASS(pc->code) == BPF_LDX) {
 
 		/* move return value to dst */
@@ -447,6 +431,22 @@ emit_xcall(struct sljit_compiler* compiler, struct bpf_insn *pc,
 		if (status != SLJIT_SUCCESS)
 			return status;
 	}
+
+	/* tmp3 = *err; */
+	status = sljit_emit_op1(compiler,
+	    SLJIT_MOV_UI,
+	    SLJIT_TEMPORARY_REG3, 0,
+	    SLJIT_MEM1(SLJIT_LOCALS_REG), arg3_offset);
+	if (status != SLJIT_SUCCESS)
+		return status;
+
+	/* if (tmp3 != 0) return 0; */
+	*ret0_jump = sljit_emit_cmp(compiler,
+	    SLJIT_C_NOT_EQUAL,
+	    SLJIT_TEMPORARY_REG3, 0,
+	    SLJIT_IMM, 0);
+	if (*ret0_jump == NULL)
+		return SLJIT_ERR_ALLOC_FAILED;
 
 	return status;
 }
@@ -1068,7 +1068,7 @@ bpfjit_optimization_hints(struct bpf_insn *insns, size_t insn_count)
 {
 	unsigned int rv = BPFJIT_INIT_A;
 	struct bpf_insn *pc;
-	int minm, maxm;
+	unsigned int minm, maxm;
 
 	BPFJIT_ASSERT(BPF_MEMWORDS - 1 <= 0xff);
 
@@ -1178,9 +1178,9 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	int branching, negate;
 	unsigned int rval, mode, src;
 	int ntmp;
-	int locals_size;
-	int minm, maxm; /* min/max k for M[k] */
-	int mem_locals_start; /* start of M[] array */
+	unsigned int locals_size;
+	unsigned int minm, maxm; /* min/max k for M[k] */
+	size_t mem_locals_start; /* start of M[] array */
 	unsigned int opts;
 	struct bpf_insn *pc;
 	struct sljit_compiler* compiler;
