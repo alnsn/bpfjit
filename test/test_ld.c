@@ -59,7 +59,7 @@ test_ld_abs(void)
 	static size_t lengths[3] = { 1, 2, 4 };
 	static unsigned int expected[3] = { 0xde, 0xdead, 0xdeadbeef };
 
-	int i, l;
+	size_t i, l;
 	uint8_t *pkt = deadbeef_at_5;
 	size_t pktsize = sizeof(deadbeef_at_5);
 
@@ -217,7 +217,7 @@ test_ld_ind(void)
 		0xde, 0xdead, 0xdeadbeef
 	};
 
-	int i, l;
+	size_t i, l;
 	uint8_t *pkt = deadbeef_at_5;
 	size_t pktsize = sizeof(deadbeef_at_5);
 
@@ -340,7 +340,7 @@ test_ld_len(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	int i;
+	size_t i;
 	bpfjit_function_t code;
 	uint8_t pkt[32]; /* the program doesn't read any data */
 
@@ -391,7 +391,7 @@ test_ld_ind_x_overflow1(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	int i;
+	size_t i;
 	bpfjit_function_t code;
 	uint8_t pkt[8] = { 10, 20, 30, 40, 50, 60, 70, 80 };
 
@@ -422,7 +422,7 @@ test_ld_ind_x_overflow2(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	int i;
+	size_t i;
 	bpfjit_function_t code;
 	uint8_t pkt[8] = { 10, 20, 30, 40, 50, 60, 70, 80 };
 
