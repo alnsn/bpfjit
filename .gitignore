@@ -3,3 +3,5 @@ sljit/**/*.c
 sljit/**/.svn
 sljit/.svn
 sljit/README
+sljit/API_CHANGES
+sljit/INTERNAL_CHANGES
