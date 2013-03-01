@@ -115,7 +115,7 @@ struct bpfjit_read_pkt_data
 	/*
 	 * If positive, emit "if (buflen < bj_check_length) return 0".
 	 * We assume that buflen is never equal to UINT32_MAX (otherwise,
-	 * we need a special bool variable to emit unconditional "return 0").
+	 * we'd need a special bool variable to emit unconditional "return 0").
 	 */
 	uint32_t bj_check_length;
 };
@@ -339,8 +339,10 @@ emit_read32(struct sljit_compiler* compiler, uint32_t k)
  * BPF_LD+BPF_B+BPF_IND    A <- P[X+k:1]
  * BPF_LDX+BPF_B+BPF_MSH   X <- 4*(P[k:1]&0xf)
  *
- * dst must be BPFJIT_A for BPF_LD instructions and BPFJIT_X
- * or any of BPFJIT_TMP* registrers for BPF_MSH instruction.
+ * The dst variable should be
+ *  - BPFJIT_A when emitting code for BPF_LD instructions,
+ *  - BPFJIT_X or any of BPFJIT_TMP* registrers when emitting
+ *    code for BPF_MSH instruction.
  */
 static int
 emit_xcall(struct sljit_compiler* compiler, struct bpf_insn *pc,
