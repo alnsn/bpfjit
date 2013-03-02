@@ -27,7 +27,7 @@ tags
 sljit/**/*.h
 sljit/**/*.c
 sljit/**/.svn
-sljit/**/.plist
+sljit/**/*.plist
 sljit/.svn
 sljit/README
 sljit/API_CHANGES
