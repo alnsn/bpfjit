@@ -169,24 +169,6 @@ read_width(struct bpf_insn *pc)
 }
 
 /*
- * Get offset of M[k] on the stack.
- */
-static size_t
-mem_local_offset(uint32_t k, unsigned int minm)
-{
-	size_t moff = (k - minm) * sizeof(uint32_t);
-
-#ifdef _KERNEL
-	/*
-	 * 4 bytes for the third argument of m_xword/m_xhalf/m_xbyte.
-	 */
-	return sizeof(uint32_t) + moff;
-#else
-	return moff;
-#endif
-}
-
-/*
  * Generate code for BPF_LD+BPF_B+BPF_ABS    A <- P[k:1].
  */
 static int
@@ -367,7 +349,7 @@ emit_xcall(struct sljit_compiler* compiler, struct bpf_insn *pc,
 	/*
 	 * The third argument of fn is an address on stack.
 	 */
-	const int arg3_offset = 0;
+	const int arg3_offset = offsetof(struct bpf_stack, bf_bpfjit_private);
 
 	if (BPF_CLASS(pc->code) == BPF_LDX) {
 		/* save A */
@@ -1141,7 +1123,10 @@ bpfjit_optimization_hints(struct bpf_insn *insns, size_t insn_count)
 		case BPF_RET:
 			continue;
 		case BPF_MISC:
-			rv |= BPFJIT_INIT_X;
+			if (pc->code == (BPF_MISC|BPF_TAX) ||
+			    pc->code == (BPF_MISC|BPF_TXA)) {
+				rv |= BPFJIT_INIT_X;
+			}
 			continue;
 		default:
 			BPFJIT_ASSERT(false);
@@ -1188,10 +1173,9 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	int status;
 	int branching, negate;
 	unsigned int rval, mode, src;
-	int ntmp;
-	unsigned int locals_size;
+	int ntmp = 4;
+	unsigned int locals_size = sizeof(struct bpf_stack);
 	unsigned int minm, maxm; /* min/max k for M[k] */
-	size_t mem_locals_start; /* start of M[] array */
 	unsigned int opts;
 	struct bpf_insn *pc;
 	struct sljit_compiler* compiler;
@@ -1224,13 +1208,10 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	opts = bpfjit_optimization_hints(insns, insn_count);
 	minm = opts & 0xff;
 	maxm = (opts >> 8) & 0xff;
-	mem_locals_start = mem_local_offset(0, 0);
-	locals_size = (minm <= maxm) ?
-	    mem_local_offset(maxm + 1, minm) : mem_locals_start;
 
-	ntmp = 4;
 #ifdef _KERNEL
 	ntmp += 1; /* for BPFJIT_KERN_TMP */
+	locals_size += sizeof(void*); /* for emit_xcall() */
 #endif
 
 	returns_maxsize = count_returns(insns, insn_count);
@@ -1269,10 +1250,11 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	if (status != SLJIT_SUCCESS)
 		goto fail;
 
-	for (i = mem_locals_start; i < locals_size; i+= sizeof(uint32_t)) {
+	for (i = minm; i <= maxm; i++) {
 		status = sljit_emit_op1(compiler,
 		    SLJIT_MOV_UI,
-		    SLJIT_MEM1(SLJIT_LOCALS_REG), i,
+		    SLJIT_MEM1(SLJIT_LOCALS_REG),
+		    offsetof(struct bpf_stack, bf_mem) + i * sizeof(uint32_t),
 		    SLJIT_IMM, 0);
 		if (status != SLJIT_SUCCESS)
 			goto fail;
@@ -1362,7 +1344,8 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				    SLJIT_MOV_UI,
 				    BPFJIT_A, 0,
 				    SLJIT_MEM1(SLJIT_LOCALS_REG),
-				    mem_local_offset(pc->k, minm));
+				    offsetof(struct bpf_stack, bf_mem) +
+				        pc->k * sizeof(uint32_t));
 				if (status != SLJIT_SUCCESS)
 					goto fail;
 
@@ -1433,7 +1416,8 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				    SLJIT_MOV_UI,
 				    BPFJIT_X, 0,
 				    SLJIT_MEM1(SLJIT_LOCALS_REG),
-				    mem_local_offset(pc->k, minm));
+				    offsetof(struct bpf_stack, bf_mem) +
+				        pc->k * sizeof(uint32_t));
 				if (status != SLJIT_SUCCESS)
 					goto fail;
 
@@ -1458,7 +1442,8 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			status = sljit_emit_op1(compiler,
 			    SLJIT_MOV_UI,
 			    SLJIT_MEM1(SLJIT_LOCALS_REG),
-			    mem_local_offset(pc->k, minm),
+			    offsetof(struct bpf_stack, bf_mem) + 
+			        pc->k * sizeof(uint32_t),
 			    BPFJIT_A, 0);
 			if (status != SLJIT_SUCCESS)
 				goto fail;
@@ -1472,7 +1457,8 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 			status = sljit_emit_op1(compiler,
 			    SLJIT_MOV_UI,
 			    SLJIT_MEM1(SLJIT_LOCALS_REG),
-			    mem_local_offset(pc->k, minm),
+			    offsetof(struct bpf_stack, bf_mem) + 
+			        pc->k * sizeof(uint32_t),
 			    BPFJIT_X, 0);
 			if (status != SLJIT_SUCCESS)
 				goto fail;
