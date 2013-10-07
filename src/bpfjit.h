@@ -49,10 +49,19 @@
 #define BPF_COPX 0x40
 #endif
 
+/*
+ * The sole purpose of bpf_stack and bpf_aux_arg structs is to bypass
+ * three arguments restriction of sljit generated functions.
+ */
 struct bpf_stack {
-	void *bf_arg;
+	void *bf_cop_arg;
 	uint32_t bf_mem[BPF_MEMWORDS];
 	void *bf_bpfjit_private[]; /* For private use by bpfjit. */
+};
+
+struct bpf_aux_arg {
+	void *bf_cop_arg;
+	unsigned int bf_wirelen;
 };
 
 /*
@@ -64,7 +73,7 @@ struct bpf_stack {
  * return value is truncated to unsigned int.
  */
 typedef unsigned int (*bpfjit_function_t)(const uint8_t *p,
-    unsigned int wirelen, unsigned int buflen);
+    const struct bpf_aux_arg *arg, unsigned int buflen);
 
 bpfjit_function_t bpfjit_generate_code(struct bpf_insn *insns,
     size_t insn_count);

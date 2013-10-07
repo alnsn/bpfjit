@@ -54,7 +54,7 @@ test_misc_tax(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(code(pkt, sizeof(pkt), sizeof(pkt)) == 55);
+	CHECK(code(pkt, get_aux_arg(sizeof(pkt)), sizeof(pkt)) == 55);
 
 	bpfjit_free_code(code);
 }
@@ -78,7 +78,7 @@ test_misc_txa(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(code(pkt, 1, 1) == 391);
+	CHECK(code(pkt, get_aux_arg(1), 1) == 391);
 
 	bpfjit_free_code(code);
 }

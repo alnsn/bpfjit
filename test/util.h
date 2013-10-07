@@ -27,8 +27,10 @@
  * SUCH DAMAGE.
  */
 
-#ifndef BPFJIT_TESTS_TEST_H
-#define BPFJIT_TESTS_TEST_H
+#ifndef BPFJIT_TEST_UTIL_H
+#define BPFJIT_TEST_UTIL_H
+
+#include "bpfjit.h"
 
 #include <err.h>
 #include <stdlib.h>
@@ -43,4 +45,13 @@ extern int exit_status;
 	exit_status = EXIT_FAILURE; \
 	warnx("%s:%u (in %s): %s", __FILE__, __LINE__, __func__, #x); }
 
-#endif /* #ifndef BPFJIT_TESTS_TEST_H */
+static inline const struct bpf_aux_arg *
+get_aux_arg(unsigned int wirelen)
+{
+	static struct bpf_aux_arg obj;
+
+	obj.bf_wirelen =  wirelen;
+	return &obj;
+}
+
+#endif /* #ifndef BPFJIT_TEST_UTIL_H */

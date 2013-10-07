@@ -63,7 +63,7 @@
 #define BPFJIT_TMP1	SLJIT_SCRATCH_REG2
 #define BPFJIT_TMP2	SLJIT_SCRATCH_REG3
 #define BPFJIT_BUF	SLJIT_SAVED_REG1
-#define BPFJIT_WIRELEN	SLJIT_SAVED_REG2
+#define BPFJIT_AUX_ARG	SLJIT_SAVED_REG2
 #define BPFJIT_BUFLEN	SLJIT_SAVED_REG3
 #define BPFJIT_KERN_TMP SLJIT_TEMPORARY_EREG2
 
@@ -1250,6 +1250,30 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 	if (status != SLJIT_SUCCESS)
 		goto fail;
 
+#ifdef _KERNEL
+	/* Copy bf_cop_arg to the bpf_stack object. */
+	status = sljit_emit_op1(compiler,
+	    SLJIT_MOV_P,
+	    SLJIT_MEM1(SLJIT_LOCALS_REG),
+	    offsetof(struct bpf_stack, bf_cop_arg),
+	    SLJIT_MEM1(BPFJIT_AUX_ARG),
+	    offsetof(struct bpf_aux_arg, bf_cop_arg));
+	if (status != SLJIT_SUCCESS)
+		goto fail;
+#endif
+
+	/* XXX Optimize away when it's not needed. */
+	if (1) {
+		/* Copy bf_wirelen to BPFJIT_AUX_ARG. */
+		status = sljit_emit_op1(compiler,
+		    SLJIT_MOV_UI,
+		    BPFJIT_AUX_ARG, 0,
+		    SLJIT_MEM1(BPFJIT_AUX_ARG),
+		    offsetof(struct bpf_aux_arg, bf_wirelen));
+		if (status != SLJIT_SUCCESS)
+			goto fail;
+	}
+
 	for (i = minm; i <= maxm; i++) {
 		status = sljit_emit_op1(compiler,
 		    SLJIT_MOV_UI,
@@ -1357,7 +1381,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				status = sljit_emit_op1(compiler,
 				    SLJIT_MOV,
 				    BPFJIT_A, 0,
-				    BPFJIT_WIRELEN, 0);
+				    BPFJIT_AUX_ARG, 0);
 				if (status != SLJIT_SUCCESS)
 					goto fail;
 
@@ -1399,7 +1423,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				status = sljit_emit_op1(compiler,
 				    SLJIT_MOV,
 				    BPFJIT_X, 0,
-				    BPFJIT_WIRELEN, 0);
+				    BPFJIT_AUX_ARG, 0);
 				if (status != SLJIT_SUCCESS)
 					goto fail;
 
