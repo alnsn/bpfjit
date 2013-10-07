@@ -476,7 +476,7 @@ emit_pkt_read(struct sljit_compiler* compiler,
 		    BPFJIT_BUFLEN, 0,
 		    SLJIT_IMM, 0);
 		if (to_mchain_jump == NULL)
-  			return SLJIT_ERR_ALLOC_FAILED;
+			return SLJIT_ERR_ALLOC_FAILED;
 	}
 #endif
 
@@ -507,7 +507,7 @@ emit_pkt_read(struct sljit_compiler* compiler,
 		    BPFJIT_TMP1, 0,
 		    BPFJIT_X, 0);
 		if (jump == NULL)
-  			return SLJIT_ERR_ALLOC_FAILED;
+			return SLJIT_ERR_ALLOC_FAILED;
 		ret0[(*ret0_size)++] = jump;
 	}
 
@@ -540,12 +540,12 @@ emit_pkt_read(struct sljit_compiler* compiler,
 #ifdef _KERNEL
 	over_mchain_jump = sljit_emit_jump(compiler, SLJIT_JUMP);
 	if (over_mchain_jump == NULL)
-  		return SLJIT_ERR_ALLOC_FAILED;
+		return SLJIT_ERR_ALLOC_FAILED;
 
 	/* entry point to mchain handler */
 	label = sljit_emit_label(compiler);
 	if (label == NULL)
-  		return SLJIT_ERR_ALLOC_FAILED;
+		return SLJIT_ERR_ALLOC_FAILED;
 	sljit_set_label(to_mchain_jump, label);
 
 	if (check_zero_buflen) {
@@ -608,7 +608,7 @@ emit_msh(struct sljit_compiler* compiler,
 		    BPFJIT_BUFLEN, 0,
 		    SLJIT_IMM, 0);
 		if (to_mchain_jump == NULL)
- 			return SLJIT_ERR_ALLOC_FAILED;
+			return SLJIT_ERR_ALLOC_FAILED;
 	}
 #endif
 
@@ -656,7 +656,7 @@ emit_msh(struct sljit_compiler* compiler,
 		    BPFJIT_BUFLEN, 0,
 		    SLJIT_IMM, 0);
 		if (jump == NULL)
-  			return SLJIT_ERR_ALLOC_FAILED;
+			return SLJIT_ERR_ALLOC_FAILED;
 		ret0[(*ret0_size)++] = jump;
 	}
 
@@ -1521,7 +1521,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 				    status = emit_division(compiler,
 				        SLJIT_IMM, (uint32_t)pc->k);
 				} else {
-    				    status = emit_pow2_division(compiler,
+				    status = emit_pow2_division(compiler,
 				        (uint32_t)pc->k);
 				}
 				if (status != SLJIT_SUCCESS)
