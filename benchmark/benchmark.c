@@ -36,17 +36,7 @@
 #include <stdlib.h>
 
 
-static inline const struct bpf_aux_arg *
-get_aux_arg(unsigned int wirelen)
-{
-	static struct bpf_aux_arg obj;
-
-	obj.bf_wirelen =  wirelen;
-	return &obj;
-}
-
-unsigned int filter_pkt(const uint8_t *pkt,
-    const struct bpf_aux_arg *arg, unsigned int buflen);
+size_t filter_pkt(bpf_ctx_t *, bpf_args_t *);
 
 void usage(const char *prog);
 void test_bpf_filter(size_t counter, size_t dummy);
@@ -90,7 +80,7 @@ test_fun(bpfjit_function_t fun, const uint8_t *pkt,
 	unsigned int ret = 0;
 
 	for (i = 0; i < counter; i++)
-		ret += fun(pkt, get_aux_arg(pktsize), pktsize);
+		ret += bpfjit_call(fun, pkt, pktsize, pktsize, NULL);
 
 	if (counter == dummy)
 		printf("%s returned %u\n", msg, ret);

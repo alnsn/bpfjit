@@ -56,7 +56,7 @@ test_jmp_ja(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(code(pkt, get_aux_arg(1), 1) == UINT32_MAX);
+	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == UINT32_MAX);
 
 	bpfjit_free_code(code);
 }
@@ -94,14 +94,14 @@ test_jmp_gt_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(code(pkt, get_aux_arg(1), 1) == 1);
-	CHECK(code(pkt, get_aux_arg(2), 2) == 1);
-	CHECK(code(pkt, get_aux_arg(3), 3) == 7);
-	CHECK(code(pkt, get_aux_arg(4), 4) == 7);
-	CHECK(code(pkt, get_aux_arg(5), 5) == 7);
-	CHECK(code(pkt, get_aux_arg(6), 6) == 8);
-	CHECK(code(pkt, get_aux_arg(7), 7) == 5);
-	CHECK(code(pkt, get_aux_arg(8), 8) == 0);
+	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 1);
+	CHECK(bpfjit_call(code, pkt, 2, 2, NULL) == 1);
+	CHECK(bpfjit_call(code, pkt, 3, 3, NULL) == 7);
+	CHECK(bpfjit_call(code, pkt, 4, 4, NULL) == 7);
+	CHECK(bpfjit_call(code, pkt, 5, 5, NULL) == 7);
+	CHECK(bpfjit_call(code, pkt, 6, 6, NULL) == 8);
+	CHECK(bpfjit_call(code, pkt, 7, 7, NULL) == 5);
+	CHECK(bpfjit_call(code, pkt, 8, 8, NULL) == 0);
 
 	bpfjit_free_code(code);
 }
@@ -139,14 +139,14 @@ test_jmp_ge_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(code(pkt, get_aux_arg(1), 1) == 1);
-	CHECK(code(pkt, get_aux_arg(2), 2) == 1);
-	CHECK(code(pkt, get_aux_arg(3), 3) == 7);
-	CHECK(code(pkt, get_aux_arg(4), 4) == 7);
-	CHECK(code(pkt, get_aux_arg(5), 5) == 7);
-	CHECK(code(pkt, get_aux_arg(6), 6) == 8);
-	CHECK(code(pkt, get_aux_arg(7), 7) == 5);
-	CHECK(code(pkt, get_aux_arg(8), 8) == 0);
+	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 1);
+	CHECK(bpfjit_call(code, pkt, 2, 2, NULL) == 1);
+	CHECK(bpfjit_call(code, pkt, 3, 3, NULL) == 7);
+	CHECK(bpfjit_call(code, pkt, 4, 4, NULL) == 7);
+	CHECK(bpfjit_call(code, pkt, 5, 5, NULL) == 7);
+	CHECK(bpfjit_call(code, pkt, 6, 6, NULL) == 8);
+	CHECK(bpfjit_call(code, pkt, 7, 7, NULL) == 5);
+	CHECK(bpfjit_call(code, pkt, 8, 8, NULL) == 0);
 
 	bpfjit_free_code(code);
 }
@@ -184,14 +184,14 @@ test_jmp_eq_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(code(pkt, get_aux_arg(1), 1) == 7);
-	CHECK(code(pkt, get_aux_arg(2), 2) == 7);
-	CHECK(code(pkt, get_aux_arg(3), 3) == 1);
-	CHECK(code(pkt, get_aux_arg(4), 4) == 7);
-	CHECK(code(pkt, get_aux_arg(5), 5) == 7);
-	CHECK(code(pkt, get_aux_arg(6), 6) == 8);
-	CHECK(code(pkt, get_aux_arg(7), 7) == 5);
-	CHECK(code(pkt, get_aux_arg(8), 8) == 0);
+	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 7);
+	CHECK(bpfjit_call(code, pkt, 2, 2, NULL) == 7);
+	CHECK(bpfjit_call(code, pkt, 3, 3, NULL) == 1);
+	CHECK(bpfjit_call(code, pkt, 4, 4, NULL) == 7);
+	CHECK(bpfjit_call(code, pkt, 5, 5, NULL) == 7);
+	CHECK(bpfjit_call(code, pkt, 6, 6, NULL) == 8);
+	CHECK(bpfjit_call(code, pkt, 7, 7, NULL) == 5);
+	CHECK(bpfjit_call(code, pkt, 8, 8, NULL) == 0);
 
 	bpfjit_free_code(code);
 }
@@ -240,7 +240,7 @@ test_jmp_modulo_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(code(pkt, get_aux_arg(1), 1) == UINT32_MAX);
+	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == UINT32_MAX);
 
 	bpfjit_free_code(code);
 }
@@ -278,14 +278,14 @@ test_jmp_jset_k(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(code(pkt, get_aux_arg(1), 1) == 1);
-	CHECK(code(pkt, get_aux_arg(2), 2) == 1);
-	CHECK(code(pkt, get_aux_arg(3), 3) == 1);
-	CHECK(code(pkt, get_aux_arg(4), 4) == 7);
-	CHECK(code(pkt, get_aux_arg(5), 5) == 5);
-	CHECK(code(pkt, get_aux_arg(6), 6) == 8);
-	CHECK(code(pkt, get_aux_arg(7), 7) == 5);
-	CHECK(code(pkt, get_aux_arg(8), 8) == 0);
+	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 1);
+	CHECK(bpfjit_call(code, pkt, 2, 2, NULL) == 1);
+	CHECK(bpfjit_call(code, pkt, 3, 3, NULL) == 1);
+	CHECK(bpfjit_call(code, pkt, 4, 4, NULL) == 7);
+	CHECK(bpfjit_call(code, pkt, 5, 5, NULL) == 5);
+	CHECK(bpfjit_call(code, pkt, 6, 6, NULL) == 8);
+	CHECK(bpfjit_call(code, pkt, 7, 7, NULL) == 5);
+	CHECK(bpfjit_call(code, pkt, 8, 8, NULL) == 0);
 
 	bpfjit_free_code(code);
 }
@@ -330,14 +330,14 @@ test_jmp_gt_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(code(pkt, get_aux_arg(1), 1) == 1);
-	CHECK(code(pkt, get_aux_arg(2), 2) == 1);
-	CHECK(code(pkt, get_aux_arg(3), 3) == 7);
-	CHECK(code(pkt, get_aux_arg(4), 4) == 7);
-	CHECK(code(pkt, get_aux_arg(5), 5) == 7);
-	CHECK(code(pkt, get_aux_arg(6), 6) == 8);
-	CHECK(code(pkt, get_aux_arg(7), 7) == 5);
-	CHECK(code(pkt, get_aux_arg(8), 8) == 0);
+	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 1);
+	CHECK(bpfjit_call(code, pkt, 2, 2, NULL) == 1);
+	CHECK(bpfjit_call(code, pkt, 3, 3, NULL) == 7);
+	CHECK(bpfjit_call(code, pkt, 4, 4, NULL) == 7);
+	CHECK(bpfjit_call(code, pkt, 5, 5, NULL) == 7);
+	CHECK(bpfjit_call(code, pkt, 6, 6, NULL) == 8);
+	CHECK(bpfjit_call(code, pkt, 7, 7, NULL) == 5);
+	CHECK(bpfjit_call(code, pkt, 8, 8, NULL) == 0);
 
 	bpfjit_free_code(code);
 }
@@ -382,14 +382,14 @@ test_jmp_ge_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(code(pkt, get_aux_arg(1), 1) == 1);
-	CHECK(code(pkt, get_aux_arg(2), 2) == 1);
-	CHECK(code(pkt, get_aux_arg(3), 3) == 7);
-	CHECK(code(pkt, get_aux_arg(4), 4) == 7);
-	CHECK(code(pkt, get_aux_arg(5), 5) == 7);
-	CHECK(code(pkt, get_aux_arg(6), 6) == 8);
-	CHECK(code(pkt, get_aux_arg(7), 7) == 5);
-	CHECK(code(pkt, get_aux_arg(8), 8) == 0);
+	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 1);
+	CHECK(bpfjit_call(code, pkt, 2, 2, NULL) == 1);
+	CHECK(bpfjit_call(code, pkt, 3, 3, NULL) == 7);
+	CHECK(bpfjit_call(code, pkt, 4, 4, NULL) == 7);
+	CHECK(bpfjit_call(code, pkt, 5, 5, NULL) == 7);
+	CHECK(bpfjit_call(code, pkt, 6, 6, NULL) == 8);
+	CHECK(bpfjit_call(code, pkt, 7, 7, NULL) == 5);
+	CHECK(bpfjit_call(code, pkt, 8, 8, NULL) == 0);
 
 	bpfjit_free_code(code);
 }
@@ -433,14 +433,14 @@ test_jmp_eq_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(code(pkt, get_aux_arg(1), 1) == 7);
-	CHECK(code(pkt, get_aux_arg(2), 2) == 7);
-	CHECK(code(pkt, get_aux_arg(3), 3) == 1);
-	CHECK(code(pkt, get_aux_arg(4), 4) == 7);
-	CHECK(code(pkt, get_aux_arg(5), 5) == 7);
-	CHECK(code(pkt, get_aux_arg(6), 6) == 8);
-	CHECK(code(pkt, get_aux_arg(7), 7) == 5);
-	CHECK(code(pkt, get_aux_arg(8), 8) == 0);
+	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 7);
+	CHECK(bpfjit_call(code, pkt, 2, 2, NULL) == 7);
+	CHECK(bpfjit_call(code, pkt, 3, 3, NULL) == 1);
+	CHECK(bpfjit_call(code, pkt, 4, 4, NULL) == 7);
+	CHECK(bpfjit_call(code, pkt, 5, 5, NULL) == 7);
+	CHECK(bpfjit_call(code, pkt, 6, 6, NULL) == 8);
+	CHECK(bpfjit_call(code, pkt, 7, 7, NULL) == 5);
+	CHECK(bpfjit_call(code, pkt, 8, 8, NULL) == 0);
 
 	bpfjit_free_code(code);
 }
@@ -484,14 +484,14 @@ test_jmp_jset_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(code(pkt, get_aux_arg(1), 1) == 1);
-	CHECK(code(pkt, get_aux_arg(2), 2) == 1);
-	CHECK(code(pkt, get_aux_arg(3), 3) == 1);
-	CHECK(code(pkt, get_aux_arg(4), 4) == 7);
-	CHECK(code(pkt, get_aux_arg(5), 5) == 5);
-	CHECK(code(pkt, get_aux_arg(6), 6) == 8);
-	CHECK(code(pkt, get_aux_arg(7), 7) == 5);
-	CHECK(code(pkt, get_aux_arg(8), 8) == 0);
+	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 1);
+	CHECK(bpfjit_call(code, pkt, 2, 2, NULL) == 1);
+	CHECK(bpfjit_call(code, pkt, 3, 3, NULL) == 1);
+	CHECK(bpfjit_call(code, pkt, 4, 4, NULL) == 7);
+	CHECK(bpfjit_call(code, pkt, 5, 5, NULL) == 5);
+	CHECK(bpfjit_call(code, pkt, 6, 6, NULL) == 8);
+	CHECK(bpfjit_call(code, pkt, 7, 7, NULL) == 5);
+	CHECK(bpfjit_call(code, pkt, 8, 8, NULL) == 0);
 
 	bpfjit_free_code(code);
 }
@@ -550,7 +550,7 @@ test_jmp_modulo_x(void)
 	code = bpfjit_generate_code(insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(code(pkt, get_aux_arg(1), 1) == UINT32_MAX);
+	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == UINT32_MAX);
 
 	bpfjit_free_code(code);
 }

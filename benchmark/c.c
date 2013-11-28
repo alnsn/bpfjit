@@ -27,11 +27,12 @@
  * SUCH DAMAGE.
  */
 
+#include "bpfjit.h"
+
 #include <stddef.h>
 #include <stdint.h>
 
-unsigned int filter_pkt(const uint8_t *pkt,
-    const struct bpf_aux_arg *arg, unsigned int buflen);
+size_t filter_pkt(bpf_ctx_t *, bpf_args_t *);
 
 /* Copied from <sys/endian.h> */
 static __inline uint16_t
@@ -67,10 +68,11 @@ my_be32dec(const void *buf)
  * BPF_STMT(BPF_RET+BPF_K, UINT32_MAX),
  * BPF_STMT(BPF_RET+BPF_K, 0),
  */
-unsigned int
-filter_pkt(const uint8_t *pkt,
-    const struct bpf_aux_arg *arg, unsigned int buflen)
+size_t
+filter_pkt(bpf_ctx_t *ctx, bpf_args_t *args)
 {
+	const uint8_t *pkt = args->pkt;
+	size_t buflen  = args->buflen;
 	uint32_t x;
 
 	if (buflen < 14)

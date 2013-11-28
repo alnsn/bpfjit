@@ -45,13 +45,4 @@ extern int exit_status;
 	exit_status = EXIT_FAILURE; \
 	warnx("%s:%u (in %s): %s", __FILE__, __LINE__, __func__, #x); }
 
-static inline const struct bpf_aux_arg *
-get_aux_arg(unsigned int wirelen)
-{
-	static struct bpf_aux_arg obj;
-
-	obj.bf_wirelen =  wirelen;
-	return &obj;
-}
-
 #endif /* #ifndef BPFJIT_TEST_UTIL_H */
