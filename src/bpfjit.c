@@ -1147,6 +1147,8 @@ bpfjit_optimization_hints(struct bpf_insn *insns, size_t insn_count)
 				rv |= BPFJIT_INIT_X;
 			}
 			continue;
+		case BPF_COPX:
+			rv |= BPFJIT_INIT_X;
 		default:
 			BPFJIT_ASSERT(false);
 		}
