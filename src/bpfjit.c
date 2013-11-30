@@ -60,7 +60,8 @@
 
 /*
  * Arguments of generated bpfjit_function_t.
- * The first argument is reassigned upon entry.
+ * The first argument is reassigned upon entry
+ * to a more frequently used buf argument.
  */
 #define BPFJIT_CTX_ARG	SLJIT_SAVED_REG1
 #define BPFJIT_ARGS	SLJIT_SAVED_REG2
@@ -68,14 +69,21 @@
 /*
  * Permanent register assignments.
  */
-#define BPFJIT_A	SLJIT_SCRATCH_REG1
-#define BPFJIT_X	SLJIT_TEMPORARY_EREG1
-#define BPFJIT_TMP1	SLJIT_SCRATCH_REG2
-#define BPFJIT_TMP2	SLJIT_SCRATCH_REG3
 #define BPFJIT_BUF	SLJIT_SAVED_REG1
 //#define BPFJIT_ARGS  	SLJIT_SAVED_REG2
 #define BPFJIT_BUFLEN	SLJIT_SAVED_REG3
-#define BPFJIT_KERN_TMP SLJIT_TEMPORARY_EREG2
+#define BPFJIT_A	SLJIT_SCRATCH_REG1
+#define BPFJIT_TMP1	SLJIT_SCRATCH_REG2
+#define BPFJIT_TMP2	SLJIT_SCRATCH_REG3
+#define BPFJIT_X	SLJIT_TEMPORARY_EREG1
+#define BPFJIT_TMP3	SLJIT_TEMPORARY_EREG2
+
+/*
+ * EREG registers can't be used for indirect calls, reuse BPFJIT_BUF and
+ * BPFJIT_BUFLEN registers. They can be easily restored from BPFJIT_ARGS.
+ */
+#define BPFJIT_COPFUNCS_PTR	SLJIT_SAVED_REG1
+#define BPFJIT_COPFUNCS_IDX	SLJIT_SAVED_REG3
 
 /* 
  * Flags for bpfjit_optimization_hints().
@@ -185,6 +193,32 @@ read_width(struct bpf_insn *pc)
 		BPFJIT_ASSERT(false);
 		return 0;
 	}
+}
+
+/*
+ * Copy buf and buflen members of bpf_args from BPFJIT_ARGS
+ * pointer to BPFJIT_BUF and BPFJIT_BUFLEN registers.
+ */
+static int
+load_buf_buflen(struct sljit_compiler *compiler)
+{
+	int status;
+
+	status = sljit_emit_op1(compiler,
+	    SLJIT_MOV_P,
+	    BPFJIT_BUF, 0,
+	    SLJIT_MEM1(BPFJIT_ARGS),
+	    offsetof(struct bpf_args, pkt));
+	if (status != SLJIT_SUCCESS)
+		return status;
+
+	status = sljit_emit_op1(compiler,
+	    SLJIT_MOV,
+	    BPFJIT_BUFLEN, 0,
+	    SLJIT_MEM1(BPFJIT_ARGS),
+	    offsetof(struct bpf_args, buflen));
+
+	return status;
 }
 
 /*
@@ -376,7 +410,7 @@ emit_xcall(struct sljit_compiler* compiler, struct bpf_insn *pc,
 		/* save A */
 		status = sljit_emit_op1(compiler,
 		    SLJIT_MOV,
-		    BPFJIT_KERN_TMP, 0,
+		    BPFJIT_TMP3, 0,
 		    BPFJIT_A, 0);
 		if (status != SLJIT_SUCCESS)
 			return status;
@@ -434,7 +468,7 @@ emit_xcall(struct sljit_compiler* compiler, struct bpf_insn *pc,
 		status = sljit_emit_op1(compiler,
 		    SLJIT_MOV,
 		    BPFJIT_A, 0,
-		    BPFJIT_KERN_TMP, 0);
+		    BPFJIT_TMP3, 0);
 		if (status != SLJIT_SUCCESS)
 			return status;
 	}
@@ -459,10 +493,56 @@ emit_xcall(struct sljit_compiler* compiler, struct bpf_insn *pc,
 }
 #endif
 
+/*
+ * Emit code for BPF_COP and BPF_COPX instructions.
+ */
 static int
-emit_cop(struct sljit_compiler* compiler, bpf_ctx_t *bc, struct bpf_insn *pc)
+emit_cop(struct sljit_compiler* compiler, bpf_ctx_t *bc, struct bpf_insn *pc,
+    struct sljit_jump **ret0_jump)
 {
+#if BPFJIT_X == SLJIT_RETURN_REG       || \
+    BPFJIT_X == SLJIT_SCRATCH_REG1     || \
+    BPFJIT_X == SLJIT_SCRATCH_REG2     || \
+    BPFJIT_X == SLJIT_SCRATCH_REG3     || \
+    BPFJIT_COPFUNCS_PTR == BPFJIT_ARGS || \
+    BPFJIT_COPFUNCS_IDX	== BPFJIT_ARGS
+#error "Not supported assignment of registers."
+#endif
+
+	struct sljit_jump *jump;
 	int status;
+	bool skip;
+
+	jump = NULL;
+	skip = false;
+
+	if (bc == NULL) {
+		skip = true;
+		jump = sljit_emit_jump(compiler, SLJIT_JUMP);
+		if (jump == NULL)
+			return SLJIT_ERR_ALLOC_FAILED;
+	}
+
+	if (BPF_MISCOP(pc->code) == BPF_COP && !skip && pc->k >= bc->nfuncs) {
+		skip = true;
+		jump = sljit_emit_jump(compiler, SLJIT_JUMP);
+		if (jump == NULL)
+			return SLJIT_ERR_ALLOC_FAILED;
+	} else if (BPF_MISCOP(pc->code) == BPF_COPX && !skip) {
+		/* if (X >= bc->nfuncs) return 0; */
+		jump = sljit_emit_cmp(compiler,
+		    SLJIT_C_GREATER_EQUAL,
+		    BPFJIT_X, 0,
+		    SLJIT_IMM, bc->nfuncs);
+		if (jump == NULL)
+			return SLJIT_ERR_ALLOC_FAILED;
+	}
+
+	if (jump != NULL)
+		*ret0_jump = jump;
+
+	if (skip)
+		return SLJIT_SUCCESS;
 
 	/* Copy A to bpf_state object. */
 	status = sljit_emit_op1(compiler,
@@ -497,14 +577,49 @@ emit_cop(struct sljit_compiler* compiler, bpf_ctx_t *bc, struct bpf_insn *pc)
 	if (status != SLJIT_SUCCESS)
 		return status;
 
-	BPFJIT_ASSERT(pc->k < bc->nfuncs);
+	if (BPF_MISCOP(pc->code) == BPF_COP) {
+		status = sljit_emit_ijump(compiler,
+		    SLJIT_CALL3,
+		    SLJIT_IMM, SLJIT_FUNC_OFFSET(bc->copfuncs[pc->k]));
+		if (status != SLJIT_SUCCESS)
+			return status;
+	} else if (BPF_MISCOP(pc->code) == BPF_COPX) {
+		/* load ctx to BPFJIT_COPFUNCS_PTR */
+		status = sljit_emit_op1(compiler,
+		    SLJIT_MOV_P,
+		    BPFJIT_COPFUNCS_PTR, 0,
+		    SLJIT_MEM1(SLJIT_LOCALS_REG),
+		    offsetof(struct bpfjit_stack, ctx));
+		if (status != SLJIT_SUCCESS)
+			return status;
 
-	/* Generate bpf_copfunc_t call. */
-	status = sljit_emit_ijump(compiler,
-	    SLJIT_CALL3,
-	    SLJIT_IMM, SLJIT_FUNC_OFFSET(bc->copfuncs[pc->k]));
-	if (status != SLJIT_SUCCESS)
-		return status;
+		status = sljit_emit_op1(compiler,
+		    SLJIT_MOV_P,
+		    BPFJIT_COPFUNCS_IDX, 0,
+		    BPFJIT_X, 0);
+		if (status != SLJIT_SUCCESS)
+			return status;
+
+		/* load copfuncs */
+		status = sljit_emit_op1(compiler,
+		    SLJIT_MOV_P,
+		    BPFJIT_COPFUNCS_PTR, 0,
+		    SLJIT_MEM1(BPFJIT_COPFUNCS_PTR),
+		    offsetof(struct bpf_ctx, copfuncs));
+		if (status != SLJIT_SUCCESS)
+			return status;
+
+		status = sljit_emit_ijump(compiler,
+		    SLJIT_CALL3,
+		    SLJIT_MEM2(BPFJIT_COPFUNCS_PTR, BPFJIT_COPFUNCS_IDX),
+		    SLJIT_WORD_SHIFT);
+		if (status != SLJIT_SUCCESS)
+			return status;
+
+		status = load_buf_buflen(compiler);
+		if (status != SLJIT_SUCCESS)
+			return status;
+	}
 
 #if BPFJIT_A != SLJIT_RETURN_REG
 	status = sljit_emit_op1(compiler,
@@ -1134,6 +1249,9 @@ bpf_jmp_to_sljit_cond(struct bpf_insn *pc, bool negate)
 	return rv;
 }
 
+/*
+ * XXX nscratches.
+ */
 static unsigned int
 bpfjit_optimization_hints(struct bpf_insn *insns, size_t insn_count)
 {
@@ -1253,7 +1371,6 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 	int status;
 	int branching, negate;
 	unsigned int rval, mode, src;
-	int ntmp = 4;
 	unsigned int minm, maxm; /* min/max k for M[k] */
 	unsigned int opts;
 	struct bpf_insn *pc;
@@ -1288,10 +1405,6 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 	minm = opts & 0xff;
 	maxm = (opts >> 8) & 0xff;
 
-#ifdef _KERNEL
-	ntmp += 1; /* for BPFJIT_KERN_TMP */
-#endif
-
 	returns_maxsize = count_returns(insns, insn_count);
 	if (returns_maxsize  == 0)
 		goto fail;
@@ -1325,25 +1438,11 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 #endif
 
 	status = sljit_emit_enter(compiler,
-	    2, ntmp, 3, sizeof(struct bpfjit_stack));
+	    2, 5, 3, sizeof(struct bpfjit_stack));
 	if (status != SLJIT_SUCCESS)
 		goto fail;
 
-	/* Copy ctx argument to the stack. */
-	status = sljit_emit_op1(compiler,
-	    SLJIT_MOV_P,
-	    SLJIT_MEM1(SLJIT_LOCALS_REG),
-	    offsetof(struct bpfjit_stack, ctx),
-	    BPFJIT_CTX_ARG, 0);
-	if (status != SLJIT_SUCCESS)
-		goto fail;
-
-	/* Copy args->pkt to the register. */
-	status = sljit_emit_op1(compiler,
-	    SLJIT_MOV_P,
-	    BPFJIT_BUF, 0,
-	    SLJIT_MEM1(BPFJIT_ARGS),
-	    offsetof(struct bpf_args, pkt));
+	status = load_buf_buflen(compiler);
 	if (status != SLJIT_SUCCESS)
 		goto fail;
 
@@ -1757,17 +1856,14 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 				continue;
 
 			case BPF_COP:
-				if (bc == NULL || pc->k >= bc->nfuncs) {
-					jump = sljit_emit_jump(compiler,
-					    SLJIT_JUMP);
-					if (jump == NULL)
-						goto fail;
+			case BPF_COPX:
+				jump = NULL;
+				status = emit_cop(compiler, bc, pc, &jump);
+				if (status != SLJIT_SUCCESS)
+					goto fail;
+
+				if (jump != NULL)
 					ret0[ret0_size++] = jump;
-				} else {
-					status = emit_cop(compiler, bc, pc);
-					if (status != SLJIT_SUCCESS)
-						goto fail;
-				}
 
 				continue;
 			}
