@@ -54,7 +54,7 @@ test_stx1(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	for (i = 1; i <= sizeof(pkt); i++)
@@ -81,7 +81,7 @@ test_stx2(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 0);
@@ -118,7 +118,7 @@ test_stx3(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	for (i = 1; i <= sizeof(pkt); i++)
@@ -167,7 +167,7 @@ test_stx4(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	for (k = 1; k <= sizeof(pkt); k++)

@@ -50,7 +50,7 @@ test_ldx_imm1(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == UINT32_MAX - 5);
@@ -76,7 +76,7 @@ test_ldx_imm2(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == UINT32_MAX);
@@ -101,7 +101,7 @@ test_ldx_len1(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	for (i = 1; i < sizeof(pkt); i++) {
@@ -130,7 +130,7 @@ test_ldx_len2(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 5, 1, NULL) == UINT32_MAX);
@@ -155,7 +155,7 @@ test_ldx_msh(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 2, 2, NULL) == 40);

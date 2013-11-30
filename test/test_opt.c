@@ -76,7 +76,7 @@ test_opt_ld_abs_1(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	for (i = 0; i < 2; i++) {
@@ -126,7 +126,7 @@ test_opt_ld_abs_2(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	for (i = 0; i < 2; i++) {
@@ -176,7 +176,7 @@ test_opt_ld_abs_3(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	for (i = 0; i < 2; i++) {
@@ -227,7 +227,7 @@ test_opt_ld_ind_1(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	for (i = 0; i < 2; i++) {
@@ -278,7 +278,7 @@ test_opt_ld_ind_2(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	for (i = 0; i < 2; i++) {
@@ -330,7 +330,7 @@ test_opt_ld_ind_3(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	for (i = 0; i < 2; i++) {
@@ -382,7 +382,7 @@ test_opt_ld_ind_4(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	for (i = 0; i < 2; i++) {

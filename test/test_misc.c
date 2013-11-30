@@ -51,7 +51,7 @@ test_misc_tax(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, sizeof(pkt), sizeof(pkt), NULL) == 55);
@@ -75,7 +75,7 @@ test_misc_txa(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 391);

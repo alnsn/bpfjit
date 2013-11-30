@@ -100,7 +100,8 @@ test_bpfjit(size_t counter, const uint8_t *pkt,
 {
 	bpfjit_function_t code;
 
-	code = bpfjit_generate_code(insns, sizeof(insns) / sizeof(insns[0]));
+	code = bpfjit_generate_code(NULL, insns,
+	    sizeof(insns) / sizeof(insns[0]));
 	test_fun(code, pkt, pktsize, counter, dummy, "bpfjit code");
 	bpfjit_free_code(code);
 }

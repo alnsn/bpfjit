@@ -50,7 +50,7 @@ test_alu_add_k(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 5);
@@ -74,7 +74,7 @@ test_alu_sub_k(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == UINT32_MAX);
@@ -98,7 +98,7 @@ test_alu_mul_k(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == UINT32_C(0xfffffffd));
@@ -121,7 +121,7 @@ test_alu_div0_k(void)
 
 	//CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 0);
@@ -145,7 +145,7 @@ test_alu_div1_k(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 7);
@@ -169,7 +169,7 @@ test_alu_div2_k(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 3);
@@ -193,7 +193,7 @@ test_alu_div4_k(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == UINT32_C(0x3fffffff));
@@ -217,7 +217,7 @@ test_alu_div10_k(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == UINT32_C(429484384));
@@ -241,7 +241,7 @@ test_alu_div10000_k(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == UINT32_C(429484));
@@ -265,7 +265,7 @@ test_alu_div7609801_k(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 564);
@@ -289,7 +289,7 @@ test_alu_div0x80000000_k(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 1);
@@ -313,7 +313,7 @@ test_alu_and_k(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == (0xdead&0xbeef));
@@ -337,7 +337,7 @@ test_alu_or_k(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 0xdeadbeef);
@@ -361,7 +361,7 @@ test_alu_lsh_k(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 0xbeef0000);
@@ -385,7 +385,7 @@ test_alu_lsh0_k(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 0xdeadbeef);
@@ -409,7 +409,7 @@ test_alu_rsh_k(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 0x0000dead);
@@ -433,7 +433,7 @@ test_alu_rsh0_k(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 0xdeadbeef);
@@ -489,7 +489,7 @@ test_alu_modulo_k(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) != UINT32_C(0x71cbbbc3));
@@ -516,7 +516,7 @@ test_alu_add_x(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 5);
@@ -541,7 +541,7 @@ test_alu_sub_x(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == UINT32_MAX);
@@ -566,7 +566,7 @@ test_alu_mul_x(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == UINT32_C(0xfffffffd));
@@ -590,7 +590,7 @@ test_alu_div0_x(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 0);
@@ -615,7 +615,7 @@ test_alu_div1_x(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 7);
@@ -640,7 +640,7 @@ test_alu_div2_x(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 3);
@@ -665,7 +665,7 @@ test_alu_div4_x(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == UINT32_C(0x3fffffff));
@@ -690,7 +690,7 @@ test_alu_div10_x(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == UINT32_C(429484384));
@@ -715,7 +715,7 @@ test_alu_div10000_x(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == UINT32_C(429484));
@@ -740,7 +740,7 @@ test_alu_div7609801_x(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 564);
@@ -765,7 +765,7 @@ test_alu_div0x80000000_x(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 1);
@@ -790,7 +790,7 @@ test_alu_and_x(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == (0xdead&0xbeef));
@@ -815,7 +815,7 @@ test_alu_or_x(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 0xdeadbeef);
@@ -840,7 +840,7 @@ test_alu_lsh_x(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 0xbeef0000);
@@ -865,7 +865,7 @@ test_alu_lsh0_x(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 0xdeadbeef);
@@ -890,7 +890,7 @@ test_alu_rsh_x(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 0x0000dead);
@@ -915,7 +915,7 @@ test_alu_rsh0_x(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 0xdeadbeef);
@@ -939,7 +939,7 @@ test_alu_neg(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 0u-777u);
@@ -1004,7 +1004,7 @@ test_alu_modulo_x(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) != UINT32_C(0x71cbbbc3));

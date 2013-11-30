@@ -85,7 +85,7 @@
 
 struct bpfjit_stack
 {
-	bpf_state_t state;
+	bpf_state_t state; // must be at offset 0
 	bpf_ctx_t *ctx;
 #ifdef _KERNEL
 	void *tmp;
@@ -463,6 +463,65 @@ emit_xcall(struct sljit_compiler* compiler, struct bpf_insn *pc,
 	return status;
 }
 #endif
+
+static int
+emit_cop(struct sljit_compiler* compiler, bpf_ctx_t *bc, struct bpf_insn *pc)
+{
+	int status;
+
+	/* Copy A to bpf_state object. */
+	status = sljit_emit_op1(compiler,
+	    SLJIT_MOV_P,
+	    SLJIT_MEM1(SLJIT_LOCALS_REG),
+	    offsetof(struct bpf_state, regA),
+	    BPFJIT_A, 0);
+	if (status != SLJIT_SUCCESS)
+		return status;
+
+	/*
+	 * Copy bpf_copfunc_t arguments to registers.
+	 */
+	status = sljit_emit_op1(compiler,
+	    SLJIT_MOV_P,
+	    SLJIT_SCRATCH_REG1, 0,
+	    SLJIT_MEM1(SLJIT_LOCALS_REG),
+	    offsetof(struct bpfjit_stack, ctx));
+	if (status != SLJIT_SUCCESS)
+		return status;
+
+	status = sljit_emit_op1(compiler,
+	    SLJIT_MOV_P,
+	    SLJIT_SCRATCH_REG2, 0,
+	    BPFJIT_ARGS, 0);
+	if (status != SLJIT_SUCCESS)
+		return status;
+
+	status = sljit_get_local_base(compiler,
+	    SLJIT_SCRATCH_REG3, 0,
+	    offsetof(struct bpfjit_stack, state));
+	if (status != SLJIT_SUCCESS)
+		return status;
+
+	BPFJIT_ASSERT(pc->k < bc->nfuncs);
+
+	/* Generate bpf_copfunc_t call. */
+	status = sljit_emit_ijump(compiler,
+	    SLJIT_CALL3,
+	    SLJIT_IMM, SLJIT_FUNC_OFFSET(bc->copfuncs[pc->k]));
+	if (status != SLJIT_SUCCESS)
+		return status;
+
+#if BPFJIT_A != SLJIT_RETURN_REG
+	status = sljit_emit_op1(compiler,
+	    SLJIT_MOV,
+	    BPFJIT_A, 0,
+	    SLJIT_RETURN_REG, 0);
+	if (status != SLJIT_SUCCESS)
+		return status;
+#endif
+
+	return status;
+}
 
 /*
  * Generate code for
@@ -984,8 +1043,8 @@ optimize(struct bpf_insn *insns,
  * insn_dat should be initialized by optimize().
  */
 static size_t
-get_ret0_size(struct bpf_insn *insns, struct bpfjit_insn_data *insn_dat,
-    size_t insn_count)
+get_ret0_size(bpf_ctx_t *bc, struct bpf_insn *insns,
+    struct bpfjit_insn_data *insn_dat, size_t insn_count)
 {
 	size_t rv = 0;
 	size_t i;
@@ -1011,6 +1070,11 @@ get_ret0_size(struct bpf_insn *insns, struct bpfjit_insn_data *insn_dat,
 
 		if (insns[i].code == (BPF_ALU|BPF_DIV|BPF_K) &&
 		    insns[i].k == 0) {
+			rv++;
+		}
+
+		if (insns[i].code == (BPF_MISC|BPF_COP) &&
+		    (bc == NULL || insns[i].k >= bc->nfuncs)) {
 			rv++;
 		}
 	}
@@ -1187,7 +1251,7 @@ kx_to_reg_arg(struct bpf_insn *pc)
 }
 
 bpfjit_function_t
-bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
+bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 {
 	void *rv;
 	size_t i;
@@ -1245,7 +1309,7 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 		goto fail;
 
 	ret0_size = 0;
-	ret0_maxsize = get_ret0_size(insns, insn_dat, insn_count);
+	ret0_maxsize = get_ret0_size(bc, insns, insn_dat, insn_count);
 	if (ret0_maxsize > 0) {
 		ret0 = BPFJIT_ALLOC(ret0_maxsize * sizeof(ret0[0]));
 		if (ret0 == NULL)
@@ -1676,7 +1740,8 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 
 		case BPF_MISC:
 
-			if (pc->code == (BPF_MISC|BPF_TAX)) {
+			switch (BPF_MISCOP(pc->code)) {
+			case BPF_TAX:
 				status = sljit_emit_op1(compiler,
 				    SLJIT_MOV_UI,
 				    BPFJIT_X, 0,
@@ -1685,15 +1750,29 @@ bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count)
 					goto fail;
 
 				continue;
-			}
 
-			if (pc->code == (BPF_MISC|BPF_TXA)) {
+			case BPF_TXA:
 				status = sljit_emit_op1(compiler,
 				    SLJIT_MOV,
 				    BPFJIT_A, 0,
 				    BPFJIT_X, 0);
 				if (status != SLJIT_SUCCESS)
 					goto fail;
+
+				continue;
+
+			case BPF_COP:
+				if (bc == NULL || pc->k >= bc->nfuncs) {
+					jump = sljit_emit_jump(compiler,
+					    SLJIT_JUMP);
+					if (jump == NULL)
+						goto fail;
+					ret0[ret0_size++] = jump;
+				} else {
+					status = emit_cop(compiler, bc, pc);
+					if (status != SLJIT_SUCCESS)
+						goto fail;
+				}
 
 				continue;
 			}

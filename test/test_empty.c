@@ -38,5 +38,5 @@ test_empty(void)
 {
 	struct bpf_insn dummy;
 
-	CHECK(bpfjit_generate_code(&dummy, 0) == NULL);
+	CHECK(bpfjit_generate_code(NULL, &dummy, 0) == NULL);
 }

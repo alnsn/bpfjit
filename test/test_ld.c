@@ -70,7 +70,7 @@ test_ld_abs(void)
 
 		CHECK(bpf_validate(insns[i], insn_count));
 
-		code = bpfjit_generate_code(insns[i], insn_count);
+		code = bpfjit_generate_code(NULL, insns[i], insn_count);
 		REQUIRE(code != NULL);
 
 		for (l = 0; l < 5 + lengths[i]; l++) {
@@ -165,7 +165,7 @@ test_ld_abs_k_overflow(void)
 
 		CHECK(bpf_validate(insns[i], insn_count));
 
-		code = bpfjit_generate_code(insns[i], insn_count);
+		code = bpfjit_generate_code(NULL, insns[i], insn_count);
 		REQUIRE(code != NULL);
 
 		CHECK(bpfjit_call(code, pkt, 8, 8, NULL) == 0);
@@ -228,7 +228,7 @@ test_ld_ind(void)
 
 		CHECK(bpf_validate(insns[i], insn_count));
 
-		code = bpfjit_generate_code(insns[i], insn_count);
+		code = bpfjit_generate_code(NULL, insns[i], insn_count);
 		REQUIRE(code != NULL);
 
 		for (l = 0; l < 5 + lengths[i]; l++) {
@@ -323,7 +323,7 @@ test_ld_ind_k_overflow(void)
 
 		CHECK(bpf_validate(insns[i], insn_count));
 
-		code = bpfjit_generate_code(insns[i], insn_count);
+		code = bpfjit_generate_code(NULL, insns[i], insn_count);
 		REQUIRE(code != NULL);
 
 		CHECK(bpfjit_call(code, pkt, 8, 8, NULL) == 0);
@@ -348,7 +348,7 @@ test_ld_len(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	for (i = 0; i < sizeof(pkt); i++)
@@ -372,7 +372,7 @@ test_ld_imm(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == UINT32_MAX);
@@ -399,7 +399,7 @@ test_ld_ind_x_overflow1(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	for (i = 1; i <= sizeof(pkt); i++) {
@@ -430,7 +430,7 @@ test_ld_ind_x_overflow2(void)
 
 	CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(insns, insn_count);
+	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
 	for (i = 1; i <= sizeof(pkt); i++) {

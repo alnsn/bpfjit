@@ -80,7 +80,7 @@ struct bpf_state {
 typedef size_t (*bpfjit_function_t)(bpf_ctx_t *, bpf_args_t *);
 
 bpfjit_function_t
-bpfjit_generate_code(struct bpf_insn *insns, size_t insn_count);
+bpfjit_generate_code(bpf_ctx_t *, struct bpf_insn *, size_t);
 
 void
 bpfjit_free_code(bpfjit_function_t code);
