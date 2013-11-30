@@ -359,8 +359,10 @@ emit_xcall(struct sljit_compiler* compiler, struct bpf_insn *pc,
     int dst, sljit_sw dstw, struct sljit_jump **ret0_jump,
     uint32_t (*fn)(const struct mbuf *, uint32_t, int *))
 {
-#if BPFJIT_X != SLJIT_SCRATCH_EREG1 || \
-    BPFJIT_X == SLJIT_RETURN_REG
+#if BPFJIT_X == SLJIT_RETURN_REG   || \
+    BPFJIT_X == SLJIT_SCRATCH_REG1 || \
+    BPFJIT_X == SLJIT_SCRATCH_REG2 || \
+    BPFJIT_X == SLJIT_SCRATCH_REG3 || \
 #error "Not supported assignment of registers."
 #endif
 	int status;
@@ -813,8 +815,8 @@ emit_division(struct sljit_compiler* compiler, int divt, sljit_sw divw)
 {
 	int status;
 
-#if BPFJIT_X == SLJIT_SCRATCH_REG1 || \
-    BPFJIT_X == SLJIT_RETURN_REG     || \
+#if BPFJIT_X == SLJIT_RETURN_REG   || \
+    BPFJIT_X == SLJIT_SCRATCH_REG1 || \
     BPFJIT_X == SLJIT_SCRATCH_REG2 || \
     BPFJIT_A == SLJIT_SCRATCH_REG2
 #error "Not supported assignment of registers."
