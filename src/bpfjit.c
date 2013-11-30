@@ -418,8 +418,7 @@ emit_xcall(struct sljit_compiler* compiler, struct bpf_insn *pc,
 	    SLJIT_CALL3,
 	    SLJIT_IMM, SLJIT_FUNC_OFFSET(fn));
 
-	if (BPF_CLASS(pc->code) == BPF_LDX) {
-
+	if (BPF_CLASS(pc->code) == BPF_LDX || dst != SLJIT_RETURN_REG) {
 		/* move return value to dst */
 		BPFJIT_ASSERT(dst != SLJIT_RETURN_REG);
 		status = sljit_emit_op1(compiler,
@@ -428,20 +427,14 @@ emit_xcall(struct sljit_compiler* compiler, struct bpf_insn *pc,
 		    SLJIT_RETURN_REG, 0);
 		if (status != SLJIT_SUCCESS)
 			return status;
+	}
 
+	if (BPF_CLASS(pc->code) == BPF_LDX) {
 		/* restore A */
 		status = sljit_emit_op1(compiler,
 		    SLJIT_MOV,
 		    BPFJIT_A, 0,
 		    BPFJIT_KERN_TMP, 0);
-		if (status != SLJIT_SUCCESS)
-			return status;
-
-	} else if (dst != SLJIT_RETURN_REG) {
-		status = sljit_emit_op1(compiler,
-		    SLJIT_MOV,
-		    dst, dstw,
-		    SLJIT_RETURN_REG, 0);
 		if (status != SLJIT_SUCCESS)
 			return status;
 	}
