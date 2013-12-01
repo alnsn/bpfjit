@@ -87,9 +87,13 @@ bpfjit_free_code(bpfjit_function_t code);
 
 static inline size_t
 bpfjit_call(bpfjit_function_t f, const uint8_t *p,
-    unsigned int wirelen, unsigned int buflen, void *arg)
+    unsigned int wirelen, unsigned int buflen)
 {
-	bpf_args_t args = { p, wirelen, buflen, arg };
+	bpf_args_t args;
+	
+	args.pkt = p;
+	args.wirelen = wirelen;
+	args.buflen = buflen;
 
 	return f(NULL, &args);
 }

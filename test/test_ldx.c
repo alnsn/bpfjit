@@ -53,7 +53,7 @@ test_ldx_imm1(void)
 	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == UINT32_MAX - 5);
+	CHECK(bpfjit_call(code, pkt, 1, 1) == UINT32_MAX - 5);
 
 	bpfjit_free_code(code);
 }
@@ -79,7 +79,7 @@ test_ldx_imm2(void)
 	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == UINT32_MAX);
+	CHECK(bpfjit_call(code, pkt, 1, 1) == UINT32_MAX);
 
 	bpfjit_free_code(code);
 }
@@ -105,8 +105,8 @@ test_ldx_len1(void)
 	REQUIRE(code != NULL);
 
 	for (i = 1; i < sizeof(pkt); i++) {
-		CHECK(bpfjit_call(code, pkt, i, 1, NULL) == i);
-		CHECK(bpfjit_call(code, pkt, i + 1, i, NULL) == i + 1);
+		CHECK(bpfjit_call(code, pkt, i, 1) == i);
+		CHECK(bpfjit_call(code, pkt, i + 1, i) == i + 1);
 	}
 
 	bpfjit_free_code(code);
@@ -133,8 +133,8 @@ test_ldx_len2(void)
 	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_call(code, pkt, 5, 1, NULL) == UINT32_MAX);
-	CHECK(bpfjit_call(code, pkt, 6, 5, NULL) == 7);
+	CHECK(bpfjit_call(code, pkt, 5, 1) == UINT32_MAX);
+	CHECK(bpfjit_call(code, pkt, 6, 5) == 7);
 
 	bpfjit_free_code(code);
 }
@@ -158,7 +158,7 @@ test_ldx_msh(void)
 	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_call(code, pkt, 2, 2, NULL) == 40);
+	CHECK(bpfjit_call(code, pkt, 2, 2) == 40);
 
 	bpfjit_free_code(code);
 }

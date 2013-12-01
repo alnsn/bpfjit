@@ -74,16 +74,16 @@ test_ld_abs(void)
 		REQUIRE(code != NULL);
 
 		for (l = 0; l < 5 + lengths[i]; l++) {
-			CHECK(bpfjit_call(code, pkt, l, l, NULL) == 0);
-			CHECK(bpfjit_call(code, pkt, pktsize, l, NULL) == 0);
+			CHECK(bpfjit_call(code, pkt, l, l) == 0);
+			CHECK(bpfjit_call(code, pkt, pktsize, l) == 0);
 		}
 
 		l = 5 + lengths[i];
-		CHECK(bpfjit_call(code, pkt, l, l, NULL) == expected[i]);
-		CHECK(bpfjit_call(code, pkt, pktsize, l, NULL) == expected[i]);
+		CHECK(bpfjit_call(code, pkt, l, l) == expected[i]);
+		CHECK(bpfjit_call(code, pkt, pktsize, l) == expected[i]);
 
 		l = pktsize;
-		CHECK(bpfjit_call(code, pkt, l, l, NULL) == expected[i]);
+		CHECK(bpfjit_call(code, pkt, l, l) == expected[i]);
 
 		bpfjit_free_code(code);
 	}
@@ -168,7 +168,7 @@ test_ld_abs_k_overflow(void)
 		code = bpfjit_generate_code(NULL, insns[i], insn_count);
 		REQUIRE(code != NULL);
 
-		CHECK(bpfjit_call(code, pkt, 8, 8, NULL) == 0);
+		CHECK(bpfjit_call(code, pkt, 8, 8) == 0);
 
 		bpfjit_free_code(code);
 	}
@@ -232,16 +232,16 @@ test_ld_ind(void)
 		REQUIRE(code != NULL);
 
 		for (l = 0; l < 5 + lengths[i]; l++) {
-			CHECK(bpfjit_call(code, pkt, l, l, NULL) == 0);
-			CHECK(bpfjit_call(code, pkt, pktsize, l, NULL) == 0);
+			CHECK(bpfjit_call(code, pkt, l, l) == 0);
+			CHECK(bpfjit_call(code, pkt, pktsize, l) == 0);
 		}
 
 		l = 5 + lengths[i];
-		CHECK(bpfjit_call(code, pkt, l, l, NULL) == expected[i]);
-		CHECK(bpfjit_call(code, pkt, pktsize, l, NULL) == expected[i]);
+		CHECK(bpfjit_call(code, pkt, l, l) == expected[i]);
+		CHECK(bpfjit_call(code, pkt, pktsize, l) == expected[i]);
 
 		l = pktsize;
-		CHECK(bpfjit_call(code, pkt, l, l, NULL) == expected[i]);
+		CHECK(bpfjit_call(code, pkt, l, l) == expected[i]);
 
 		bpfjit_free_code(code);
 	}
@@ -326,7 +326,7 @@ test_ld_ind_k_overflow(void)
 		code = bpfjit_generate_code(NULL, insns[i], insn_count);
 		REQUIRE(code != NULL);
 
-		CHECK(bpfjit_call(code, pkt, 8, 8, NULL) == 0);
+		CHECK(bpfjit_call(code, pkt, 8, 8) == 0);
 
 		bpfjit_free_code(code);
 	}
@@ -352,7 +352,7 @@ test_ld_len(void)
 	REQUIRE(code != NULL);
 
 	for (i = 0; i < sizeof(pkt); i++)
-		CHECK(bpfjit_call(code, pkt, i, 1, NULL) == i);
+		CHECK(bpfjit_call(code, pkt, i, 1) == i);
 
 	bpfjit_free_code(code);
 }
@@ -375,7 +375,7 @@ test_ld_imm(void)
 	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == UINT32_MAX);
+	CHECK(bpfjit_call(code, pkt, 1, 1) == UINT32_MAX);
 
 	bpfjit_free_code(code);
 }
@@ -404,7 +404,7 @@ test_ld_ind_x_overflow1(void)
 
 	for (i = 1; i <= sizeof(pkt); i++) {
 		CHECK(bpf_filter(insns, pkt, i, i) == 10 * i);
-		CHECK(bpfjit_call(code, pkt, i, i, NULL) == 10 * i);
+		CHECK(bpfjit_call(code, pkt, i, i) == 10 * i);
 	}
 
 	bpfjit_free_code(code);
@@ -435,7 +435,7 @@ test_ld_ind_x_overflow2(void)
 
 	for (i = 1; i <= sizeof(pkt); i++) {
 		CHECK(bpf_filter(insns, pkt, i, i) == 10 * i);
-		CHECK(bpfjit_call(code, pkt, i, i, NULL) == 10 * i);
+		CHECK(bpfjit_call(code, pkt, i, i) == 10 * i);
 	}
 
 	bpfjit_free_code(code);

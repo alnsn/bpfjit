@@ -81,8 +81,8 @@ test_opt_ld_abs_1(void)
 
 	for (i = 0; i < 2; i++) {
 		for (j = 1; j < sizeof(pkt[i]); j++)
-			CHECK(bpfjit_call(code, pkt[i], j, j, NULL) == 0);
-		CHECK(bpfjit_call(code, pkt[i], j, j, NULL) == UINT32_MAX);
+			CHECK(bpfjit_call(code, pkt[i], j, j) == 0);
+		CHECK(bpfjit_call(code, pkt[i], j, j) == UINT32_MAX);
 	}
 
 	bpfjit_free_code(code);
@@ -131,8 +131,8 @@ test_opt_ld_abs_2(void)
 
 	for (i = 0; i < 2; i++) {
 		for (j = 1; j < sizeof(pkt[i]); j++)
-			CHECK(bpfjit_call(code, pkt[i], j, j, NULL) == 0);
-		CHECK(bpfjit_call(code, pkt[i], j, j, NULL) == UINT32_MAX);
+			CHECK(bpfjit_call(code, pkt[i], j, j) == 0);
+		CHECK(bpfjit_call(code, pkt[i], j, j) == UINT32_MAX);
 	}
 
 	bpfjit_free_code(code);
@@ -181,8 +181,8 @@ test_opt_ld_abs_3(void)
 
 	for (i = 0; i < 2; i++) {
 		for (j = 1; j < sizeof(pkt[i]); j++)
-			CHECK(bpfjit_call(code, pkt[i], j, j, NULL) == 0);
-		CHECK(bpfjit_call(code, pkt[i], j, j, NULL) == UINT32_MAX);
+			CHECK(bpfjit_call(code, pkt[i], j, j) == 0);
+		CHECK(bpfjit_call(code, pkt[i], j, j) == UINT32_MAX);
 	}
 
 	bpfjit_free_code(code);
@@ -232,8 +232,8 @@ test_opt_ld_ind_1(void)
 
 	for (i = 0; i < 2; i++) {
 		for (j = 1; j < sizeof(pkt[i]); j++)
-			CHECK(bpfjit_call(code, pkt[i], j, j, NULL) == 0);
-		CHECK(bpfjit_call(code, pkt[i], j, j, NULL) == UINT32_MAX);
+			CHECK(bpfjit_call(code, pkt[i], j, j) == 0);
+		CHECK(bpfjit_call(code, pkt[i], j, j) == UINT32_MAX);
 	}
 
 	bpfjit_free_code(code);
@@ -283,8 +283,8 @@ test_opt_ld_ind_2(void)
 
 	for (i = 0; i < 2; i++) {
 		for (j = 1; j < sizeof(pkt[i]); j++)
-			CHECK(bpfjit_call(code, pkt[i], j, j, NULL) == 0);
-		CHECK(bpfjit_call(code, pkt[i], j, j, NULL) == UINT32_MAX);
+			CHECK(bpfjit_call(code, pkt[i], j, j) == 0);
+		CHECK(bpfjit_call(code, pkt[i], j, j) == UINT32_MAX);
 	}
 
 	bpfjit_free_code(code);
@@ -335,8 +335,8 @@ test_opt_ld_ind_3(void)
 
 	for (i = 0; i < 2; i++) {
 		for (j = 1; j < sizeof(pkt[i]); j++)
-			CHECK(bpfjit_call(code, pkt[i], j, j, NULL) == 0);
-		CHECK(bpfjit_call(code, pkt[i], j, j, NULL) == UINT32_MAX);
+			CHECK(bpfjit_call(code, pkt[i], j, j) == 0);
+		CHECK(bpfjit_call(code, pkt[i], j, j) == UINT32_MAX);
 	}
 
 	bpfjit_free_code(code);
@@ -387,8 +387,8 @@ test_opt_ld_ind_4(void)
 
 	for (i = 0; i < 2; i++) {
 		for (j = 1; j < sizeof(pkt[i]); j++)
-			CHECK(bpfjit_call(code, pkt[i], j, j, NULL) == 0);
-		CHECK(bpfjit_call(code, pkt[i], j, j, NULL) == UINT32_MAX);
+			CHECK(bpfjit_call(code, pkt[i], j, j) == 0);
+		CHECK(bpfjit_call(code, pkt[i], j, j) == UINT32_MAX);
 	}
 
 	bpfjit_free_code(code);

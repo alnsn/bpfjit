@@ -80,7 +80,7 @@ test_fun(bpfjit_function_t fun, const uint8_t *pkt,
 	unsigned int ret = 0;
 
 	for (i = 0; i < counter; i++)
-		ret += bpfjit_call(fun, pkt, pktsize, pktsize, NULL);
+		ret += bpfjit_call(fun, pkt, pktsize, pktsize);
 
 	if (counter == dummy)
 		printf("%s returned %u\n", msg, ret);

@@ -58,7 +58,7 @@ test_stx1(void)
 	REQUIRE(code != NULL);
 
 	for (i = 1; i <= sizeof(pkt); i++)
-		CHECK(bpfjit_call(code, pkt, i, sizeof(pkt), NULL) == i);
+		CHECK(bpfjit_call(code, pkt, i, sizeof(pkt)) == i);
 
 	bpfjit_free_code(code);
 }
@@ -84,7 +84,7 @@ test_stx2(void)
 	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_call(code, pkt, 1, 1, NULL) == 0);
+	CHECK(bpfjit_call(code, pkt, 1, 1) == 0);
 
 	bpfjit_free_code(code);
 }
@@ -122,7 +122,7 @@ test_stx3(void)
 	REQUIRE(code != NULL);
 
 	for (i = 1; i <= sizeof(pkt); i++)
-		CHECK(bpfjit_call(code, pkt, i, sizeof(pkt), NULL) == 3 * i);
+		CHECK(bpfjit_call(code, pkt, i, sizeof(pkt)) == 3 * i);
 
 	bpfjit_free_code(code);
 }
@@ -171,7 +171,7 @@ test_stx4(void)
 	REQUIRE(code != NULL);
 
 	for (k = 1; k <= sizeof(pkt); k++)
-		CHECK(bpfjit_call(code, pkt, k, k, NULL) == 3*(k-1));
+		CHECK(bpfjit_call(code, pkt, k, k) == 3*(k-1));
 
 	bpfjit_free_code(code);
 }
