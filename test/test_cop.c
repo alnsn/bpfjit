@@ -42,10 +42,10 @@ retA(bpf_ctx_t *bc, bpf_args_t *args, bpf_state_t *state)
 }
 
 static uint32_t
-retM3(bpf_ctx_t *bc, bpf_args_t *args, bpf_state_t *state)
+retM(bpf_ctx_t *bc, bpf_args_t *args, bpf_state_t *state)
 {
 
-	return state->mem[3];
+	return state->mem[(uintptr_t)args->arg];
 }
 
 static uint32_t
@@ -69,15 +69,15 @@ retNF(bpf_ctx_t *bc, bpf_args_t *args, bpf_state_t *state)
 	return bc->nfuncs;
 }
 
-const bpf_copfunc_t copfuncs[] = {
+static const bpf_copfunc_t copfuncs[] = {
 	&retA,
-	&retM3,
+	&retM,
 	&retBL,
 	&retWL,
 	&retNF
 };
 
-bpf_ctx_t ctx = { copfuncs, sizeof(copfuncs) / sizeof(copfuncs[0]) };
+static bpf_ctx_t ctx = { copfuncs, sizeof(copfuncs) / sizeof(copfuncs[0]) };
 
 static void
 test_cop_no_ctx(void)
@@ -93,7 +93,7 @@ test_cop_no_ctx(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	CHECK(!bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
@@ -104,7 +104,7 @@ test_cop_no_ctx(void)
 }
 
 static void
-test_cop_retA(void)
+test_cop_ret_A(void)
 {
 	static struct bpf_insn insns[] = {
 		BPF_STMT(BPF_LD+BPF_IMM, 13),
@@ -118,7 +118,7 @@ test_cop_retA(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	CHECK(!bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(&ctx, insns, insn_count);
 	REQUIRE(code != NULL);
@@ -129,23 +129,24 @@ test_cop_retA(void)
 }
 
 static void
-test_cop_retM3(void)
+test_cop_ret_mem(void)
 {
 	static struct bpf_insn insns[] = {
 		BPF_STMT(BPF_LD+BPF_IMM, 13),
 		BPF_STMT(BPF_ST, 3),
 		BPF_STMT(BPF_LD+BPF_IMM, 1),
-		BPF_STMT(BPF_MISC+BPF_COP, 1), // retM3
+		BPF_STMT(BPF_MISC+BPF_COP, 1), // retM
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
 	bpfjit_function_t code;
 	uint8_t pkt[1] = { 0 };
-	bpf_args_t args = { pkt, sizeof(pkt), sizeof(pkt) };
+	void *arg = (void*)(uintptr_t)3;
+	bpf_args_t args = { pkt, sizeof(pkt), sizeof(pkt), arg };
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	CHECK(!bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(&ctx, insns, insn_count);
 	REQUIRE(code != NULL);
@@ -156,7 +157,7 @@ test_cop_retM3(void)
 }
 
 static void
-test_cop_retBL(void)
+test_cop_ret_buflen(void)
 {
 	static struct bpf_insn insns[] = {
 		BPF_STMT(BPF_LD+BPF_IMM, 13),
@@ -170,7 +171,7 @@ test_cop_retBL(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	CHECK(!bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(&ctx, insns, insn_count);
 	REQUIRE(code != NULL);
@@ -181,7 +182,7 @@ test_cop_retBL(void)
 }
 
 static void
-test_cop_retWL(void)
+test_cop_ret_wirelen(void)
 {
 	static struct bpf_insn insns[] = {
 		BPF_STMT(BPF_LD+BPF_IMM, 13),
@@ -195,7 +196,7 @@ test_cop_retWL(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	CHECK(!bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(&ctx, insns, insn_count);
 	REQUIRE(code != NULL);
@@ -206,7 +207,7 @@ test_cop_retWL(void)
 }
 
 static void
-test_cop_retNF(void)
+test_cop_ret_nfuncs(void)
 {
 	static struct bpf_insn insns[] = {
 		BPF_STMT(BPF_LD+BPF_IMM, 13),
@@ -220,7 +221,7 @@ test_cop_retNF(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	CHECK(!bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(&ctx, insns, insn_count);
 	REQUIRE(code != NULL);
@@ -245,7 +246,7 @@ test_cop_invalid_index(void)
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	CHECK(!bpf_validate(insns, insn_count));
+	CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(&ctx, insns, insn_count);
 	REQUIRE(code != NULL);
@@ -260,10 +261,10 @@ test_cop(void)
 {
 
 	test_cop_no_ctx();
-	test_cop_retA();
-	test_cop_retM3();
-	test_cop_retBL();
-	test_cop_retWL();
-	test_cop_retNF();
+	test_cop_ret_A();
+	test_cop_ret_mem();
+	test_cop_ret_buflen();
+	test_cop_ret_wirelen();
+	test_cop_ret_nfuncs();
 	test_cop_invalid_index();
 }
