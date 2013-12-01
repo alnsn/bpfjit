@@ -1,7 +1,8 @@
 PROG=	bpfjit_test
 SRCS=	main.c util.c test_empty.c test_ld.c \
 	test_ldx.c test_alu.c test_misc.c test_jmp.c \
-	test_st.c test_stx.c test_opt.c test_cop.c
+	test_st.c test_stx.c test_opt.c \
+	test_cop.c test_copx.c
 
 WARNS=	4
 
