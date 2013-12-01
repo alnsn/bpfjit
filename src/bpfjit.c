@@ -1182,6 +1182,10 @@ get_ret0_size(bpf_ctx_t *bc, struct bpf_insn *insns,
 		    (bc == NULL || insns[i].k >= bc->nfuncs)) {
 			rv++;
 		}
+
+		if (insns[i].code == (BPF_MISC|BPF_COPX)) {
+			rv++;
+		}
 	}
 
 	return rv;
@@ -1314,13 +1318,14 @@ bpfjit_optimization_hints(struct bpf_insn *insns, size_t insn_count)
 		case BPF_RET:
 			continue;
 		case BPF_MISC:
-			if (pc->code == (BPF_MISC|BPF_TAX) ||
-			    pc->code == (BPF_MISC|BPF_TXA)) {
+			switch (BPF_MISCOP(pc->code)) {
+			case BPF_TAX:
+			case BPF_TXA:
+			case BPF_COPX:
 				rv |= BPFJIT_INIT_X;
+				break;
 			}
 			continue;
-		case BPF_COPX:
-			rv |= BPFJIT_INIT_X;
 		default:
 			BPFJIT_ASSERT(false);
 		}
