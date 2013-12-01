@@ -584,28 +584,23 @@ emit_cop(struct sljit_compiler* compiler, bpf_ctx_t *bc, struct bpf_insn *pc,
 		if (status != SLJIT_SUCCESS)
 			return status;
 	} else if (BPF_MISCOP(pc->code) == BPF_COPX) {
-		/* load ctx to BPFJIT_COPFUNCS_PTR */
+		/* load ctx->copfuncs */
 		status = sljit_emit_op1(compiler,
 		    SLJIT_MOV_P,
 		    BPFJIT_COPFUNCS_PTR, 0,
-		    SLJIT_MEM1(SLJIT_LOCALS_REG),
-		    offsetof(struct bpfjit_stack, ctx));
+		    SLJIT_MEM1(SLJIT_SCRATCH_REG1),
+		    offsetof(struct bpf_ctx, copfuncs));
 		if (status != SLJIT_SUCCESS)
 			return status;
 
+		/* 
+		 * Load X to a register that can be used for
+		 * memory addressing.
+		 */
 		status = sljit_emit_op1(compiler,
 		    SLJIT_MOV_P,
 		    BPFJIT_COPFUNCS_IDX, 0,
 		    BPFJIT_X, 0);
-		if (status != SLJIT_SUCCESS)
-			return status;
-
-		/* load copfuncs */
-		status = sljit_emit_op1(compiler,
-		    SLJIT_MOV_P,
-		    BPFJIT_COPFUNCS_PTR, 0,
-		    SLJIT_MEM1(BPFJIT_COPFUNCS_PTR),
-		    offsetof(struct bpf_ctx, copfuncs));
 		if (status != SLJIT_SUCCESS)
 			return status;
 
@@ -1439,6 +1434,15 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 
 	status = sljit_emit_enter(compiler,
 	    2, 5, 3, sizeof(struct bpfjit_stack));
+	if (status != SLJIT_SUCCESS)
+		goto fail;
+
+	/* save ctx argument */
+	status = sljit_emit_op1(compiler,
+	    SLJIT_MOV_P,
+	    SLJIT_MEM1(SLJIT_LOCALS_REG),
+	    offsetof(struct bpfjit_stack, ctx),
+	    BPFJIT_CTX_ARG, 0);
 	if (status != SLJIT_SUCCESS)
 		goto fail;
 
