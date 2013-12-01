@@ -41,6 +41,7 @@ int main(void)
 	test_st();
 	test_stx();
 	test_opt();
+	test_cop();
 
 	return exit_status;
 }

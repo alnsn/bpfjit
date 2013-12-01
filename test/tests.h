@@ -7,3 +7,4 @@ void test_misc(void);
 void test_st(void);
 void test_stx(void);
 void test_opt(void);
+void test_cop(void);
