@@ -29,6 +29,7 @@
 
 #include <bpfjit.h>
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "util.h"
@@ -69,12 +70,26 @@ retNF(bpf_ctx_t *bc, bpf_args_t *args, bpf_state_t *state)
 	return bc->nfuncs;
 }
 
+/*
+ * COP function with a side effect.
+ */
+static uint32_t
+setARG(bpf_ctx_t *bc, bpf_args_t *args, bpf_state_t *state)
+{
+	bool *arg = (bool *)args->arg;
+	bool old = *arg;
+
+	*arg = true;
+	return old;
+}
+
 static const bpf_copfunc_t copfuncs[] = {
 	&retA,
 	&retM,
 	&retBL,
 	&retWL,
-	&retNF
+	&retNF,
+	&setARG
 };
 
 static bpf_ctx_t ctx = { copfuncs, sizeof(copfuncs) / sizeof(copfuncs[0]) };
@@ -231,12 +246,44 @@ test_cop_ret_nfuncs(void)
 	bpfjit_free_code(code);
 }
 
+/*
+ * Check that safe_length optimization doesn't skip BPF_COP call.
+ */
+static void
+test_cop_mixed_with_ld(void)
+{
+	static struct bpf_insn insns[] = {
+		BPF_STMT(BPF_LD+BPF_IMM, 13),
+		BPF_STMT(BPF_LD+BPF_B+BPF_ABS, 0),
+		BPF_STMT(BPF_MISC+BPF_COP, 5), // setARG
+		BPF_STMT(BPF_LD+BPF_B+BPF_ABS, 99999),
+		BPF_STMT(BPF_RET+BPF_A, 0)
+	};
+
+	bpfjit_function_t code;
+	bool arg = false;
+	uint8_t pkt[1] = { 0 };
+	bpf_args_t args = { pkt, sizeof(pkt), sizeof(pkt), &arg };
+
+	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
+
+	CHECK(bpf_validate(insns, insn_count));
+
+	code = bpfjit_generate_code(&ctx, insns, insn_count);
+	REQUIRE(code != NULL);
+
+	CHECK(code(&ctx, &args) == 0);
+	CHECK(arg == true);
+
+	bpfjit_free_code(code);
+}
+
 static void
 test_cop_invalid_index(void)
 {
 	static struct bpf_insn insns[] = {
 		BPF_STMT(BPF_LD+BPF_IMM, 13),
-		BPF_STMT(BPF_MISC+BPF_COP, 5), // invalid index
+		BPF_STMT(BPF_MISC+BPF_COP, 6), // invalid index
 		BPF_STMT(BPF_RET+BPF_K, 27)
 	};
 
@@ -266,5 +313,6 @@ test_cop(void)
 	test_cop_ret_buflen();
 	test_cop_ret_wirelen();
 	test_cop_ret_nfuncs();
+	test_cop_mixed_with_ld();
 	test_cop_invalid_index();
 }
