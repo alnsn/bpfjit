@@ -315,4 +315,5 @@ test_cop(void)
 	test_cop_ret_nfuncs();
 	test_cop_mixed_with_ld();
 	test_cop_invalid_index();
+	/* XXX test unreachable BPF_COP insn. */
 }

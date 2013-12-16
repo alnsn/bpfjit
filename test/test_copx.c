@@ -270,5 +270,7 @@ test_copx(void)
 	test_copx_ret_buflen();
 	test_copx_ret_wirelen();
 	test_copx_ret_nfuncs();
+	/* XXX test_copx_mixed_with_ld(); */
 	test_copx_invalid_index();
+	/* XXX test unreachable BPF_COPX insn. */
 }
