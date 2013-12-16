@@ -221,6 +221,40 @@ load_buf_buflen(struct sljit_compiler *compiler)
 	return status;
 }
 
+static bool
+grow_jumps(struct sljit_jump ***jumps, size_t *size)
+{
+	struct sljit_jump **newptr;
+	const size_t elemsz = sizeof(struct sljit_jump *);
+	size_t old_size = *size;
+	size_t new_size = 2 * old_size;
+
+	if (new_size < old_size || new_size > SIZE_MAX / elemsz)
+		return false;
+
+	newptr = BPFJIT_ALLOC(new_size * elemsz);
+	if (newptr == NULL)
+		return false;
+
+	memcpy(newptr, *jumps, old_size * elemsz);
+	BPFJIT_FREE(*jumps, old_size * elemsz);
+
+	*jumps = newptr;
+	*size = new_size;
+	return true;
+}
+
+static bool
+append_jump(struct sljit_jump *jump, struct sljit_jump ***jumps,
+    size_t *size, size_t *max_size)
+{
+	if (*size == *max_size && !grow_jumps(jumps, max_size))
+		return false;
+
+	(*jumps)[(*size)++] = jump;
+	return true;
+}
+
 /*
  * Generate code for BPF_LD+BPF_B+BPF_ABS    A <- P[k:1].
  */
@@ -640,7 +674,7 @@ emit_cop(struct sljit_compiler* compiler, bpf_ctx_t *bc, struct bpf_insn *pc,
 static int
 emit_pkt_read(struct sljit_compiler* compiler,
     struct bpf_insn *pc, struct sljit_jump *to_mchain_jump,
-    struct sljit_jump **ret0, size_t *ret0_size)
+    struct sljit_jump ***ret0, size_t *ret0_size, size_t *ret0_maxsize)
 {
 	int status;
 	uint32_t width;
@@ -691,7 +725,8 @@ emit_pkt_read(struct sljit_compiler* compiler,
 		    BPFJIT_X, 0);
 		if (jump == NULL)
 			return SLJIT_ERR_ALLOC_FAILED;
-		ret0[(*ret0_size)++] = jump;
+		if (!append_jump(jump, ret0, ret0_size, ret0_maxsize))
+			return SLJIT_ERR_ALLOC_FAILED;
 	}
 
 	switch (width) {
@@ -739,7 +774,8 @@ emit_pkt_read(struct sljit_compiler* compiler,
 		    SLJIT_IMM, 0);
 		if (jump == NULL)
 			return SLJIT_ERR_ALLOC_FAILED;
-		ret0[(*ret0_size)++] = jump;
+		if (!append_jump(jump, ret0, ret0_size, ret0_maxsize))
+			return SLJIT_ERR_ALLOC_FAILED;
 	}
 
 	switch (width) {
@@ -757,7 +793,8 @@ emit_pkt_read(struct sljit_compiler* compiler,
 	if (status != SLJIT_SUCCESS)
 		return status;
 
-	ret0[(*ret0_size)++] = jump;
+	if (!append_jump(jump, ret0, ret0_size, ret0_maxsize))
+		return SLJIT_ERR_ALLOC_FAILED;
 
 	label = sljit_emit_label(compiler);
 	if (label == NULL)
@@ -774,7 +811,7 @@ emit_pkt_read(struct sljit_compiler* compiler,
 static int
 emit_msh(struct sljit_compiler* compiler,
     struct bpf_insn *pc, struct sljit_jump *to_mchain_jump,
-    struct sljit_jump **ret0, size_t *ret0_size)
+    struct sljit_jump ***ret0, size_t *ret0_size, size_t *ret0_maxsize)
 {
 	int status;
 #ifdef _KERNEL
@@ -840,13 +877,16 @@ emit_msh(struct sljit_compiler* compiler,
 		    SLJIT_IMM, 0);
 		if (jump == NULL)
 			return SLJIT_ERR_ALLOC_FAILED;
-		ret0[(*ret0_size)++] = jump;
+		if (!append_jump(jump, ret0, ret0_size, ret0_maxsize))
+			return SLJIT_ERR_ALLOC_FAILED;
 	}
 
 	status = emit_xcall(compiler, pc, BPFJIT_TMP1, 0, &jump, &m_xbyte);
 	if (status != SLJIT_SUCCESS)
 		return status;
-	ret0[(*ret0_size)++] = jump;
+
+	if (!append_jump(jump, ret0, ret0_size, ret0_maxsize))
+		return SLJIT_ERR_ALLOC_FAILED;
 
 	/* tmp1 &= 0xf */
 	status = sljit_emit_op2(compiler,
@@ -1143,55 +1183,6 @@ optimize(struct bpf_insn *insns,
 }
 
 /*
- * Count out-of-bounds and division by zero jumps.
- *
- * insn_dat should be initialized by optimize().
- */
-static size_t
-get_ret0_size(bpf_ctx_t *bc, struct bpf_insn *insns,
-    struct bpfjit_insn_data *insn_dat, size_t insn_count)
-{
-	size_t rv = 0;
-	size_t i;
-
-	for (i = 0; i < insn_count; i++) {
-
-		if (read_pkt_insn(&insns[i], NULL)) {
-			if (insn_dat[i].bj_aux.bj_rdata.bj_check_length > 0)
-				rv++;
-#ifdef _KERNEL
-			rv++;
-#endif
-		}
-
-		if (insns[i].code == (BPF_LD|BPF_IND|BPF_B) ||
-		    insns[i].code == (BPF_LD|BPF_IND|BPF_H) ||
-		    insns[i].code == (BPF_LD|BPF_IND|BPF_W)) {
-			rv++;
-		}
-
-		if (insns[i].code == (BPF_ALU|BPF_DIV|BPF_X))
-			rv++;
-
-		if (insns[i].code == (BPF_ALU|BPF_DIV|BPF_K) &&
-		    insns[i].k == 0) {
-			rv++;
-		}
-
-		if (insns[i].code == (BPF_MISC|BPF_COP) &&
-		    (bc == NULL || insns[i].k >= bc->nfuncs)) {
-			rv++;
-		}
-
-		if (insns[i].code == (BPF_MISC|BPF_COPX)) {
-			rv++;
-		}
-	}
-
-	return rv;
-}
-
-/*
  * Convert BPF_ALU operations except BPF_NEG and BPF_DIV to sljit operation.
  */
 static int
@@ -1382,7 +1373,7 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 
 	/* a list of jumps to out-of-bound return from a generated function */
 	struct sljit_jump **ret0;
-	size_t ret0_size = 0, ret0_maxsize = 0;
+	size_t ret0_size, ret0_maxsize;
 
 	struct bpfjit_insn_data *insn_dat;
 
@@ -1409,6 +1400,9 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 	if (returns_maxsize  == 0)
 		goto fail;
 
+	if (insn_count > SIZE_MAX / sizeof(insn_dat[0]))
+		goto fail;
+
 	insn_dat = BPFJIT_ALLOC(insn_count * sizeof(insn_dat[0]));
 	if (insn_dat == NULL)
 		goto fail;
@@ -1417,12 +1411,10 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 		goto fail;
 
 	ret0_size = 0;
-	ret0_maxsize = get_ret0_size(bc, insns, insn_dat, insn_count);
-	if (ret0_maxsize > 0) {
-		ret0 = BPFJIT_ALLOC(ret0_maxsize * sizeof(ret0[0]));
-		if (ret0 == NULL)
-			goto fail;
-	}
+	ret0_maxsize = 64;
+	ret0 = BPFJIT_ALLOC(ret0_maxsize * sizeof(ret0[0]));
+	if (ret0 == NULL)
+		goto fail;
 
 	returns_size = 0;
 	returns = BPFJIT_ALLOC(returns_maxsize * sizeof(returns[0]));
@@ -1527,7 +1519,9 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 #ifdef _KERNEL
 			to_mchain_jump = jump;
 #else
-			ret0[ret0_size++] = jump;
+			if (!append_jump(jump, &ret0,
+			    &ret0_size, &ret0_maxsize))
+				goto fail;
 #endif
 		}
 
@@ -1584,7 +1578,7 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 				goto fail;
 
 			status = emit_pkt_read(compiler, pc,
-			    to_mchain_jump, ret0, &ret0_size);
+			    to_mchain_jump, &ret0, &ret0_size, &ret0_maxsize);
 			if (status != SLJIT_SUCCESS)
 				goto fail;
 
@@ -1645,7 +1639,7 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 				goto fail;
 
 			status = emit_msh(compiler, pc,
-			    to_mchain_jump, ret0, &ret0_size);
+			    to_mchain_jump, &ret0, &ret0_size, &ret0_maxsize);
 			if (status != SLJIT_SUCCESS)
 				goto fail;
 
@@ -1720,12 +1714,16 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 				    SLJIT_IMM, 0);
 				if (jump == NULL)
 					goto fail;
-				ret0[ret0_size++] = jump;
+				if (!append_jump(jump, &ret0,
+				    &ret0_size, &ret0_maxsize))
+					goto fail;
 			} else if (pc->k == 0) {
 				jump = sljit_emit_jump(compiler, SLJIT_JUMP);
 				if (jump == NULL)
 					goto fail;
-				ret0[ret0_size++] = jump;
+				if (!append_jump(jump, &ret0,
+				    &ret0_size, &ret0_maxsize))
+					goto fail;
 			}
 
 			if (src == BPF_X) {
@@ -1871,8 +1869,9 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 				if (status != SLJIT_SUCCESS)
 					goto fail;
 
-				if (jump != NULL)
-					ret0[ret0_size++] = jump;
+				if (jump != NULL && !append_jump(jump,
+				    &ret0, &ret0_size, &ret0_maxsize))
+					goto fail;
 
 				continue;
 			}
@@ -1881,7 +1880,7 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 		} /* switch */
 	} /* main loop */
 
-	BPFJIT_ASSERT(ret0_size == ret0_maxsize);
+	BPFJIT_ASSERT(ret0_size <= ret0_maxsize);
 	BPFJIT_ASSERT(returns_size <= returns_maxsize);
 
 	if (returns_size > 0) {
