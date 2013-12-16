@@ -1097,12 +1097,12 @@ static int
 optimize(struct bpf_insn *insns,
     struct bpfjit_insn_data *insn_dat, size_t insn_count)
 {
+	struct bpfjit_jump *jmp, *jtf;
 	size_t i;
 	size_t first_read;
-	bool unreachable;
 	uint32_t jt, jf;
 	uint32_t length, safe_length;
-	struct bpfjit_jump *jmp, *jtf;
+	bool break_block, jump_dst, unreachable;
 
 	for (i = 0; i < insn_count; i++)
 		SLIST_INIT(&insn_dat[i].bj_jumps);
@@ -1112,8 +1112,12 @@ optimize(struct bpf_insn *insns,
 	first_read = SIZE_MAX;
 
 	for (i = 0; i < insn_count; i++) {
+		jump_dst = !SLIST_EMPTY(&insn_dat[i].bj_jumps);
+		break_block =
+		    insns[i].code == (BPF_MISC|BPF_COP) ||
+		    insns[i].code == (BPF_MISC|BPF_COPX);
 
-		if (!SLIST_EMPTY(&insn_dat[i].bj_jumps)) {
+		if (jump_dst || (break_block && !unreachable)) {
 			unreachable = false;
 
 			set_check_length(insns, insn_dat,
