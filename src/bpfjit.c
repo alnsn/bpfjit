@@ -1124,7 +1124,8 @@ optimize(struct bpf_insn *insns,
 			    first_read, i, safe_length);
 			first_read = SIZE_MAX;
 
-			safe_length = UINT32_MAX;
+			if (jump_dst)
+				safe_length = UINT32_MAX;
 			SLIST_FOREACH(jmp, &insn_dat[i].bj_jumps, bj_entries) {
 				if (jmp->bj_safe_length < safe_length)
 					safe_length = jmp->bj_safe_length;
