@@ -1011,24 +1011,6 @@ emit_division(struct sljit_compiler* compiler, int divt, sljit_sw divw)
 }
 
 /*
- * Count BPF_RET instructions.
- */
-static size_t
-count_returns(struct bpf_insn *insns, size_t insn_count)
-{
-	size_t i;
-	size_t rv;
-
-	rv = 0;
-	for (i = 0; i < insn_count; i++) {
-		if (BPF_CLASS(insns[i].code) == BPF_RET)
-			rv++;
-	}
-
-	return rv;
-}
-
-/*
  * Return true if pc is a "read from packet" instruction.
  * If length is not NULL and return value is true, *length will
  * be set to a safe length required to read a packet.
@@ -1372,10 +1354,6 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 	struct bpf_insn *pc;
 	struct sljit_compiler* compiler;
 
-	/* a list of jumps to a normal return from a generated function */
-	struct sljit_jump **returns;
-	size_t returns_size, returns_maxsize;
-
 	/* a list of jumps to out-of-bound return from a generated function */
 	struct sljit_jump **ret0;
 	size_t ret0_size, ret0_maxsize;
@@ -1394,18 +1372,13 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 	rv = NULL;
 	compiler = NULL;
 	insn_dat = NULL;
-	returns = NULL;
 	ret0 = NULL;
 
 	opts = bpfjit_optimization_hints(insns, insn_count);
 	minm = opts & 0xff;
 	maxm = (opts >> 8) & 0xff;
 
-	returns_maxsize = count_returns(insns, insn_count);
-	if (returns_maxsize  == 0)
-		goto fail;
-
-	if (insn_count > SIZE_MAX / sizeof(insn_dat[0]))
+	if (insn_count == 0 || insn_count > SIZE_MAX / sizeof(insn_dat[0]))
 		goto fail;
 
 	insn_dat = BPFJIT_ALLOC(insn_count * sizeof(insn_dat[0]));
@@ -1419,11 +1392,6 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 	ret0_maxsize = 64;
 	ret0 = BPFJIT_ALLOC(ret0_maxsize * sizeof(ret0[0]));
 	if (ret0 == NULL)
-		goto fail;
-
-	returns_size = 0;
-	returns = BPFJIT_ALLOC(returns_maxsize * sizeof(returns[0]));
-	if (returns == NULL)
 		goto fail;
 
 	compiler = sljit_create_compiler();
@@ -1809,9 +1777,8 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 
 			/* BPF_RET+BPF_K    accept k bytes */
 			if (rval == BPF_K) {
-				status = sljit_emit_op1(compiler,
-				    SLJIT_MOV,
-				    BPFJIT_A, 0,
+				status = sljit_emit_return(compiler,
+				    SLJIT_MOV_UI,
 				    SLJIT_IMM, (uint32_t)pc->k);
 				if (status != SLJIT_SUCCESS)
 					goto fail;
@@ -1819,27 +1786,11 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 
 			/* BPF_RET+BPF_A    accept A bytes */
 			if (rval == BPF_A) {
-#if BPFJIT_A != SLJIT_RETURN_REG
-				status = sljit_emit_op1(compiler,
-				    SLJIT_MOV,
-				    SLJIT_RETURN_REG, 0,
+				status = sljit_emit_return(compiler,
+				    SLJIT_MOV_UI,
 				    BPFJIT_A, 0);
 				if (status != SLJIT_SUCCESS)
 					goto fail;
-#endif
-			}
-
-			/*
-			 * Save a jump to a normal return. If the program
-			 * ends with BPF_RET, no jump is needed because
-			 * the normal return is generated right after the
-			 * last instruction.
-			 */
-			if (i != insn_count - 1) {
-				jump = sljit_emit_jump(compiler, SLJIT_JUMP);
-				if (jump == NULL)
-					goto fail;
-				returns[returns_size++] = jump;
 			}
 
 			continue;
@@ -1886,43 +1837,20 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 	} /* main loop */
 
 	BPFJIT_ASSERT(ret0_size <= ret0_maxsize);
-	BPFJIT_ASSERT(returns_size <= returns_maxsize);
-
-	if (returns_size > 0) {
-		label = sljit_emit_label(compiler);
-		if (label == NULL)
-			goto fail;
-		for (i = 0; i < returns_size; i++)
-			sljit_set_label(returns[i], label);
-	}
-
-	status = sljit_emit_return(compiler,
-	    SLJIT_MOV_UI,
-	    BPFJIT_A, 0);
-	if (status != SLJIT_SUCCESS)
-		goto fail;
 
 	if (ret0_size > 0) {
 		label = sljit_emit_label(compiler);
 		if (label == NULL)
 			goto fail;
-
 		for (i = 0; i < ret0_size; i++)
 			sljit_set_label(ret0[i], label);
-
-		status = sljit_emit_op1(compiler,
-		    SLJIT_MOV,
-		    SLJIT_RETURN_REG, 0,
-		    SLJIT_IMM, 0);
-		if (status != SLJIT_SUCCESS)
-			goto fail;
-
-		status = sljit_emit_return(compiler,
-		    SLJIT_MOV_UI,
-		    SLJIT_RETURN_REG, 0);
-		if (status != SLJIT_SUCCESS)
-			goto fail;
 	}
+
+	status = sljit_emit_return(compiler,
+	    SLJIT_MOV_UI,
+	    SLJIT_IMM, 0);
+	if (status != SLJIT_SUCCESS)
+		goto fail;
 
 	rv = sljit_generate_code(compiler);
 
@@ -1932,9 +1860,6 @@ fail:
 
 	if (insn_dat != NULL)
 		BPFJIT_FREE(insn_dat, insn_count * sizeof(insn_dat[0]));
-
-	if (returns != NULL)
-		BPFJIT_FREE(returns, returns_maxsize * sizeof(returns[0]));
 
 	if (ret0 != NULL)
 		BPFJIT_FREE(ret0, ret0_maxsize * sizeof(ret0[0]));
