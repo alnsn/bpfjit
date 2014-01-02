@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2011-2013 Alexander Nasonov.
+ * Copyright (c) 2011-2014 Alexander Nasonov.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -146,6 +146,7 @@ struct bpfjit_insn_data {
 		struct bpfjit_read_pkt_data bj_rdata;
 	} bj_aux;
 
+	unsigned int bj_invalid;
 	bool bj_unreachable;
 };
 
@@ -1074,22 +1075,33 @@ set_check_length(struct bpf_insn *insns, struct bpfjit_insn_data *insn_dat,
  * bj_check_length will be set to one value for the whole block and that
  * value will be equal to the greatest value of safe lengths of "read from
  * packet" instructions inside the block.
+ *
+ * The function also sets bits in *memwords_mask for memwords that
+ * need to be initialized to zero. Note that this set should be empty
+ * for any valid kernel filter program.
  */
-static int
-optimize(struct bpf_insn *insns,
-    struct bpfjit_insn_data *insn_dat, size_t insn_count)
+static bool
+optimize1(struct bpf_insn *insns,
+    struct bpfjit_insn_data *insn_dat, size_t insn_count,
+    unsigned int *memwords_mask)
 {
 	struct bpfjit_jump *jmp, *jtf;
 	size_t i;
 	size_t first_read;
 	uint32_t jt, jf;
 	uint32_t length, safe_length;
+	unsigned int invalid; /* borrowed from bpf_filter() */
 	bool break_block, jump_dst, unreachable;
 
-	for (i = 0; i < insn_count; i++)
+	*memwords_mask = 0;
+
+	for (i = 0; i < insn_count; i++) {
+		insn_dat[i].bj_invalid = 0;
 		SLIST_INIT(&insn_dat[i].bj_jumps);
+	}
 
 	safe_length = 0;
+	invalid = UINT_MAX;
 	unreachable = false;
 	first_read = SIZE_MAX;
 
@@ -1118,6 +1130,8 @@ optimize(struct bpf_insn *insns,
 		if (unreachable)
 			continue;
 
+		invalid |= insn_dat[i].bj_invalid;
+
 		if (read_pkt_insn(&insns[i], &length)) {
 			if (first_read == SIZE_MAX)
 				first_read = i;
@@ -1130,6 +1144,20 @@ optimize(struct bpf_insn *insns,
 			unreachable = true;
 			continue;
 
+		case BPF_LD:
+		case BPF_LDX:
+			if (BPF_MODE(insns[i].code) == BPF_MEM &&
+			    insns[i].k < BPF_MEMWORDS) {
+				*memwords_mask |= (1u << insns[i].k);
+			}
+			continue;
+
+		case BPF_ST:
+		case BPF_STX:
+			if (insns[i].k < BPF_MEMWORDS)
+				invalid &= ~(1u << insns[i].k);
+			continue;
+
 		case BPF_JMP:
 			if (insns[i].code == (BPF_JMP|BPF_JA)) {
 				jt = jf = insns[i].k;
@@ -1140,7 +1168,7 @@ optimize(struct bpf_insn *insns,
 
 			if (jt >= insn_count - (i + 1) ||
 			    jf >= insn_count - (i + 1)) {
-				return -1;
+				return false;
 			}
 
 			if (jt > 0 && jf > 0)
@@ -1160,13 +1188,22 @@ optimize(struct bpf_insn *insns,
 				    &jtf[1], bj_entries);
 			}
 
+			insn_dat[i + 1 + jf].bj_invalid |= invalid;
+			insn_dat[i + 1 + jt].bj_invalid |= invalid;
+			invalid = 0;
+
+			continue;
+
+		case BPF_COP:
+		case BPF_COPX:
+			// XXX Modify "invalid".
 			continue;
 		}
 	}
 
 	set_check_length(insns, insn_dat, first_read, insn_count, safe_length);
 
-	return 0;
+	return true;
 }
 
 /*
@@ -1234,52 +1271,22 @@ bpfjit_optimization_hints(struct bpf_insn *insns, size_t insn_count)
 {
 	unsigned int rv = BPFJIT_INIT_A;
 	struct bpf_insn *pc;
-	unsigned int minm, maxm;
 
 	BPFJIT_ASSERT(BPF_MEMWORDS - 1 <= 0xff);
-
-	maxm = 0;
-	minm = BPF_MEMWORDS - 1;
 
 	for (pc = insns; pc != insns + insn_count; pc++) {
 		switch (BPF_CLASS(pc->code)) {
 		case BPF_LD:
 			if (BPF_MODE(pc->code) == BPF_IND)
 				rv |= BPFJIT_INIT_X;
-			if (BPF_MODE(pc->code) == BPF_MEM &&
-			    (uint32_t)pc->k < BPF_MEMWORDS) {
-				if (pc->k > maxm)
-					maxm = pc->k;
-				if (pc->k < minm)
-					minm = pc->k;
-			}
 			continue;
 		case BPF_LDX:
 			rv |= BPFJIT_INIT_X;
-			if (BPF_MODE(pc->code) == BPF_MEM &&
-			    (uint32_t)pc->k < BPF_MEMWORDS) {
-				if (pc->k > maxm)
-					maxm = pc->k;
-				if (pc->k < minm)
-					minm = pc->k;
-			}
 			continue;
 		case BPF_ST:
-			if ((uint32_t)pc->k < BPF_MEMWORDS) {
-				if (pc->k > maxm)
-					maxm = pc->k;
-				if (pc->k < minm)
-					minm = pc->k;
-			}
 			continue;
 		case BPF_STX:
 			rv |= BPFJIT_INIT_X;
-			if ((uint32_t)pc->k < BPF_MEMWORDS) {
-				if (pc->k > maxm)
-					maxm = pc->k;
-				if (pc->k < minm)
-					minm = pc->k;
-			}
 			continue;
 		case BPF_ALU:
 			if (pc->code == (BPF_ALU|BPF_NEG))
@@ -1305,11 +1312,11 @@ bpfjit_optimization_hints(struct bpf_insn *insns, size_t insn_count)
 			}
 			continue;
 		default:
-			BPFJIT_ASSERT(false);
+			rv = BPFJIT_INIT_A | BPFJIT_INIT_X;
 		}
 	}
 
-	return rv | (maxm << 8) | minm;
+	return rv;
 }
 
 /*
@@ -1349,8 +1356,8 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 	int status;
 	int branching, negate;
 	unsigned int rval, mode, src;
-	unsigned int minm, maxm; /* min/max k for M[k] */
 	unsigned int opts;
+	unsigned int memwords_mask;
 	struct bpf_insn *pc;
 	struct sljit_compiler* compiler;
 
@@ -1375,8 +1382,6 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 	ret0 = NULL;
 
 	opts = bpfjit_optimization_hints(insns, insn_count);
-	minm = opts & 0xff;
-	maxm = (opts >> 8) & 0xff;
 
 	if (insn_count == 0 || insn_count > SIZE_MAX / sizeof(insn_dat[0]))
 		goto fail;
@@ -1385,7 +1390,7 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 	if (insn_dat == NULL)
 		goto fail;
 
-	if (optimize(insns, insn_dat, insn_count) < 0)
+	if (!optimize1(insns, insn_dat, insn_count, &memwords_mask))
 		goto fail;
 
 	ret0_size = 0;
@@ -1429,14 +1434,17 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 	if (status != SLJIT_SUCCESS)
 		goto fail;
 
-	for (i = minm; i <= maxm; i++) {
-		status = sljit_emit_op1(compiler,
-		    SLJIT_MOV_UI,
-		    SLJIT_MEM1(SLJIT_LOCALS_REG),
-		    offsetof(struct bpf_state, mem) + i * sizeof(uint32_t),
-		    SLJIT_IMM, 0);
-		if (status != SLJIT_SUCCESS)
-			goto fail;
+	for (i = 0; i < BPF_MEMWORDS; i++) {
+		if (memwords_mask & (1u << i)) {
+			status = sljit_emit_op1(compiler,
+			    SLJIT_MOV_UI,
+			    SLJIT_MEM1(SLJIT_LOCALS_REG),
+			    offsetof(struct bpf_state, mem) +
+			        i * sizeof(uint32_t),
+			    SLJIT_IMM, 0);
+			if (status != SLJIT_SUCCESS)
+				goto fail;
+		}
 	}
 
 	if (opts & BPFJIT_INIT_A) {
@@ -1519,7 +1527,7 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 
 			/* BPF_LD+BPF_MEM          A <- M[k] */
 			if (pc->code == (BPF_LD|BPF_MEM)) {
-				if (pc->k < minm || pc->k > maxm)
+				if (pc->k >= BPF_MEMWORDS)
 					goto fail;
 				status = sljit_emit_op1(compiler,
 				    SLJIT_MOV_UI,
@@ -1593,7 +1601,7 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 			if (mode == BPF_MEM) {
 				if (BPF_SIZE(pc->code) != BPF_W)
 					goto fail;
-				if (pc->k < minm || pc->k > maxm)
+				if (pc->k >= BPF_MEMWORDS)
 					goto fail;
 				status = sljit_emit_op1(compiler,
 				    SLJIT_MOV_UI,
@@ -1619,7 +1627,7 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 			continue;
 
 		case BPF_ST:
-			if (pc->code != BPF_ST || pc->k < minm || pc->k > maxm)
+			if (pc->code != BPF_ST || pc->k >= BPF_MEMWORDS)
 				goto fail;
 
 			status = sljit_emit_op1(compiler,
@@ -1634,7 +1642,7 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 			continue;
 
 		case BPF_STX:
-			if (pc->code != BPF_STX || pc->k < minm || pc->k > maxm)
+			if (pc->code != BPF_STX || pc->k >= BPF_MEMWORDS)
 				goto fail;
 
 			status = sljit_emit_op1(compiler,
