@@ -91,6 +91,13 @@
 #define BPFJIT_INIT_X 0x10000
 #define BPFJIT_INIT_A 0x20000
 
+typedef unsigned int bpfjit_init_mask_t;
+#define BPFJIT_INIT_NOBITS  0u
+#define BPFJIT_INIT_MBIT(k) (1u << (k))
+#define BPFJIT_INIT_MMASK   (BPFJIT_INIT_MBIT(BPF_MEMWORDS) - 1u)
+#define BPFJIT_INIT_ABIT    BPFJIT_INIT_MBIT(BPF_MEMWORDS)
+#define BPFJIT_INIT_XBIT    BPFJIT_INIT_MBIT(BPF_MEMWORDS + 1)
+
 struct bpfjit_stack
 {
 	bpf_state_t state; // must be at offset 0
@@ -146,7 +153,7 @@ struct bpfjit_insn_data {
 		struct bpfjit_read_pkt_data bj_rdata;
 	} bj_aux;
 
-	unsigned int bj_invalid;
+	bpfjit_init_mask_t bj_invalid;
 	bool bj_unreachable;
 };
 
@@ -1076,32 +1083,32 @@ set_check_length(struct bpf_insn *insns, struct bpfjit_insn_data *insn_dat,
  * value will be equal to the greatest value of safe lengths of "read from
  * packet" instructions inside the block.
  *
- * The function also sets bits in *memwords_mask for memwords that
+ * The function also sets bits in *initmask for memwords that
  * need to be initialized to zero. Note that this set should be empty
  * for any valid kernel filter program.
  */
 static bool
 optimize1(struct bpf_insn *insns,
     struct bpfjit_insn_data *insn_dat, size_t insn_count,
-    unsigned int *memwords_mask)
+    bpfjit_init_mask_t *initmask)
 {
 	struct bpfjit_jump *jmp, *jtf;
 	size_t i;
 	size_t first_read;
 	uint32_t jt, jf;
 	uint32_t length, safe_length;
-	unsigned int invalid; /* borrowed from bpf_filter() */
+	bpfjit_init_mask_t invalid; /* borrowed from bpf_filter() */
 	bool break_block, jump_dst, unreachable;
 
-	*memwords_mask = 0;
+	*initmask = BPFJIT_INIT_NOBITS;
 
 	for (i = 0; i < insn_count; i++) {
-		insn_dat[i].bj_invalid = 0;
+		insn_dat[i].bj_invalid = BPFJIT_INIT_NOBITS;
 		SLIST_INIT(&insn_dat[i].bj_jumps);
 	}
 
 	safe_length = 0;
-	invalid = UINT_MAX;
+	invalid = ~BPFJIT_INIT_NOBITS;
 	unreachable = false;
 	first_read = SIZE_MAX;
 
@@ -1148,14 +1155,14 @@ optimize1(struct bpf_insn *insns,
 		case BPF_LDX:
 			if (BPF_MODE(insns[i].code) == BPF_MEM &&
 			    insns[i].k < BPF_MEMWORDS) {
-				*memwords_mask |= (1u << insns[i].k);
+				*initmask |= BPFJIT_INIT_MBIT(insns[i].k);
 			}
 			continue;
 
 		case BPF_ST:
 		case BPF_STX:
 			if (insns[i].k < BPF_MEMWORDS)
-				invalid &= ~(1u << insns[i].k);
+				invalid &= ~BPFJIT_INIT_MBIT(insns[i].k);
 			continue;
 
 		case BPF_JMP:
@@ -1357,7 +1364,7 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 	int branching, negate;
 	unsigned int rval, mode, src;
 	unsigned int opts;
-	unsigned int memwords_mask;
+	bpfjit_init_mask_t initmask;
 	struct bpf_insn *pc;
 	struct sljit_compiler* compiler;
 
@@ -1390,7 +1397,7 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 	if (insn_dat == NULL)
 		goto fail;
 
-	if (!optimize1(insns, insn_dat, insn_count, &memwords_mask))
+	if (!optimize1(insns, insn_dat, insn_count, &initmask))
 		goto fail;
 
 	ret0_size = 0;
@@ -1435,7 +1442,7 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 		goto fail;
 
 	for (i = 0; i < BPF_MEMWORDS; i++) {
-		if (memwords_mask & (1u << i)) {
+		if (initmask & BPFJIT_INIT_MBIT(i)) {
 			status = sljit_emit_op1(compiler,
 			    SLJIT_MOV_UI,
 			    SLJIT_MEM1(SLJIT_LOCALS_REG),
