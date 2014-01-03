@@ -85,18 +85,12 @@
 #define BPFJIT_COPFUNCS_PTR	SLJIT_SAVED_REG1
 #define BPFJIT_COPFUNCS_IDX	SLJIT_SAVED_REG3
 
-/* 
- * Flags for bpfjit_optimization_hints().
- */
-#define BPFJIT_INIT_X 0x10000
-#define BPFJIT_INIT_A 0x20000
-
 typedef unsigned int bpfjit_init_mask_t;
-#define BPFJIT_INIT_NOBITS  0u
-#define BPFJIT_INIT_MBIT(k) (1u << (k))
-#define BPFJIT_INIT_MMASK   (BPFJIT_INIT_MBIT(BPF_MEMWORDS) - 1u)
-#define BPFJIT_INIT_ABIT    BPFJIT_INIT_MBIT(BPF_MEMWORDS)
-#define BPFJIT_INIT_XBIT    BPFJIT_INIT_MBIT(BPF_MEMWORDS + 1)
+#define BJ_INIT_NOBITS  0u
+#define BJ_INIT_MBIT(k) (1u << (k))
+#define BJ_INIT_MMASK   (BJ_INIT_MBIT(BPF_MEMWORDS) - 1u)
+#define BJ_INIT_ABIT    BJ_INIT_MBIT(BPF_MEMWORDS)
+#define BJ_INIT_XBIT    BJ_INIT_MBIT(BPF_MEMWORDS + 1)
 
 struct bpfjit_stack
 {
@@ -1073,6 +1067,8 @@ set_check_length(struct bpf_insn *insns, struct bpfjit_insn_data *insn_dat,
 }
 
 /*
+ * XXX nscratches.
+ *
  * The function divides instructions into blocks. Destination of a jump
  * instruction starts a new block. BPF_RET and BPF_JMP instructions
  * terminate a block. Blocks are linear, that is, there are no jumps out
@@ -1100,15 +1096,15 @@ optimize1(struct bpf_insn *insns,
 	bpfjit_init_mask_t invalid; /* borrowed from bpf_filter() */
 	bool break_block, jump_dst, unreachable;
 
-	*initmask = BPFJIT_INIT_NOBITS;
+	*initmask = BJ_INIT_NOBITS;
 
 	for (i = 0; i < insn_count; i++) {
-		insn_dat[i].bj_invalid = BPFJIT_INIT_NOBITS;
+		insn_dat[i].bj_invalid = BJ_INIT_NOBITS;
 		SLIST_INIT(&insn_dat[i].bj_jumps);
 	}
 
 	safe_length = 0;
-	invalid = ~BPFJIT_INIT_NOBITS;
+	invalid = ~BJ_INIT_NOBITS;
 	unreachable = false;
 	first_read = SIZE_MAX;
 
@@ -1148,21 +1144,80 @@ optimize1(struct bpf_insn *insns,
 
 		switch (BPF_CLASS(insns[i].code)) {
 		case BPF_RET:
+			if (BPF_RVAL(insns[i].code) == BPF_A)
+				*initmask |= invalid & BJ_INIT_ABIT;
+
 			unreachable = true;
 			continue;
 
 		case BPF_LD:
+			if (BPF_MODE(insns[i].code) == BPF_IND)
+				*initmask |= invalid & BJ_INIT_XBIT;
+
+			if (BPF_MODE(insns[i].code) == BPF_MEM &&
+			    (uint32_t)insns[i].k < BPF_MEMWORDS) {
+				*initmask |= invalid & BJ_INIT_MBIT(insns[i].k);
+			}
+
+			invalid &= ~BJ_INIT_ABIT;
+			continue;
+
 		case BPF_LDX:
 			if (BPF_MODE(insns[i].code) == BPF_MEM &&
-			    insns[i].k < BPF_MEMWORDS) {
-				*initmask |= BPFJIT_INIT_MBIT(insns[i].k);
+			    (uint32_t)insns[i].k < BPF_MEMWORDS) {
+				*initmask |= invalid & BJ_INIT_MBIT(insns[i].k);
 			}
+
+			invalid &= ~BJ_INIT_XBIT;
 			continue;
 
 		case BPF_ST:
+			*initmask |= invalid & BJ_INIT_ABIT;
+
+			if ((uint32_t)insns[i].k < BPF_MEMWORDS)
+				invalid &= ~BJ_INIT_MBIT(insns[i].k);
+
+			continue;
+
 		case BPF_STX:
-			if (insns[i].k < BPF_MEMWORDS)
-				invalid &= ~BPFJIT_INIT_MBIT(insns[i].k);
+			*initmask |= invalid & BJ_INIT_XBIT;
+
+			if ((uint32_t)insns[i].k < BPF_MEMWORDS)
+				invalid &= ~BJ_INIT_MBIT(insns[i].k);
+
+			continue;
+
+		case BPF_ALU:
+			*initmask |= invalid & BJ_INIT_ABIT;
+
+			if (insns[i].code != (BPF_ALU|BPF_NEG) &&
+			    BPF_SRC(insns[i].code) == BPF_X) {
+				*initmask |= invalid & BJ_INIT_XBIT;
+			}
+
+			invalid &= ~BJ_INIT_ABIT;
+			continue;
+
+		case BPF_MISC:
+			switch (BPF_MISCOP(insns[i].code)) {
+			case BPF_TAX: // X <- A
+				*initmask |= invalid & BJ_INIT_ABIT;
+				invalid &= ~BJ_INIT_XBIT;
+				continue;
+
+			case BPF_TXA: // A <- X
+				*initmask |= invalid & BJ_INIT_XBIT;
+				invalid &= ~BJ_INIT_ABIT;
+				continue;
+
+			case BPF_COP:
+			case BPF_COPX:
+				*initmask |= invalid & BJ_INIT_ABIT;
+				invalid &= ~BJ_INIT_ABIT;
+				// XXX Tweak MBITs.
+				continue;
+			}
+
 			continue;
 
 		case BPF_JMP:
@@ -1181,29 +1236,27 @@ optimize1(struct bpf_insn *insns,
 			if (jt > 0 && jf > 0)
 				unreachable = true;
 
+			jt += i + 1;
+			jf += i + 1;
+
 			jtf = insn_dat[i].bj_aux.bj_jdata.bj_jtf;
 
 			jtf[0].bj_jump = NULL;
 			jtf[0].bj_safe_length = safe_length;
-			SLIST_INSERT_HEAD(&insn_dat[i + 1 + jt].bj_jumps,
+			SLIST_INSERT_HEAD(&insn_dat[jt].bj_jumps,
 			    &jtf[0], bj_entries);
 
 			if (jf != jt) {
 				jtf[1].bj_jump = NULL;
 				jtf[1].bj_safe_length = safe_length;
-				SLIST_INSERT_HEAD(&insn_dat[i + 1 + jf].bj_jumps,
+				SLIST_INSERT_HEAD(&insn_dat[jf].bj_jumps,
 				    &jtf[1], bj_entries);
 			}
 
-			insn_dat[i + 1 + jf].bj_invalid |= invalid;
-			insn_dat[i + 1 + jt].bj_invalid |= invalid;
+			insn_dat[jf].bj_invalid |= invalid;
+			insn_dat[jt].bj_invalid |= invalid;
 			invalid = 0;
 
-			continue;
-
-		case BPF_COP:
-		case BPF_COPX:
-			// XXX Modify "invalid".
 			continue;
 		}
 	}
@@ -1271,62 +1324,6 @@ bpf_jmp_to_sljit_cond(struct bpf_insn *pc, bool negate)
 }
 
 /*
- * XXX nscratches.
- */
-static unsigned int
-bpfjit_optimization_hints(struct bpf_insn *insns, size_t insn_count)
-{
-	unsigned int rv = BPFJIT_INIT_A;
-	struct bpf_insn *pc;
-
-	BPFJIT_ASSERT(BPF_MEMWORDS - 1 <= 0xff);
-
-	for (pc = insns; pc != insns + insn_count; pc++) {
-		switch (BPF_CLASS(pc->code)) {
-		case BPF_LD:
-			if (BPF_MODE(pc->code) == BPF_IND)
-				rv |= BPFJIT_INIT_X;
-			continue;
-		case BPF_LDX:
-			rv |= BPFJIT_INIT_X;
-			continue;
-		case BPF_ST:
-			continue;
-		case BPF_STX:
-			rv |= BPFJIT_INIT_X;
-			continue;
-		case BPF_ALU:
-			if (pc->code == (BPF_ALU|BPF_NEG))
-				continue;
-			if (BPF_SRC(pc->code) == BPF_X)
-				rv |= BPFJIT_INIT_X;
-			continue;
-		case BPF_JMP:
-			if (pc->code == (BPF_JMP|BPF_JA))
-				continue;
-			if (BPF_SRC(pc->code) == BPF_X)
-				rv |= BPFJIT_INIT_X;
-			continue;
-		case BPF_RET:
-			continue;
-		case BPF_MISC:
-			switch (BPF_MISCOP(pc->code)) {
-			case BPF_TAX:
-			case BPF_TXA:
-			case BPF_COPX:
-				rv |= BPFJIT_INIT_X;
-				break;
-			}
-			continue;
-		default:
-			rv = BPFJIT_INIT_A | BPFJIT_INIT_X;
-		}
-	}
-
-	return rv;
-}
-
-/*
  * Convert BPF_K and BPF_X to sljit register.
  */
 static int
@@ -1363,7 +1360,6 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 	int status;
 	int branching, negate;
 	unsigned int rval, mode, src;
-	unsigned int opts;
 	bpfjit_init_mask_t initmask;
 	struct bpf_insn *pc;
 	struct sljit_compiler* compiler;
@@ -1388,8 +1384,6 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 	insn_dat = NULL;
 	ret0 = NULL;
 
-	opts = bpfjit_optimization_hints(insns, insn_count);
-
 	if (insn_count == 0 || insn_count > SIZE_MAX / sizeof(insn_dat[0]))
 		goto fail;
 
@@ -1399,6 +1393,11 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 
 	if (!optimize1(insns, insn_dat, insn_count, &initmask))
 		goto fail;
+
+#if defined(_KERNEL)
+	/* bpf_filter() checks initialization of memwords. */
+	BPFJIT_ASSERT((initmask & BJ_INIT_MMASK) == 0);
+#endif
 
 	ret0_size = 0;
 	ret0_maxsize = 64;
@@ -1442,7 +1441,7 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 		goto fail;
 
 	for (i = 0; i < BPF_MEMWORDS; i++) {
-		if (initmask & BPFJIT_INIT_MBIT(i)) {
+		if (initmask & BJ_INIT_MBIT(i)) {
 			status = sljit_emit_op1(compiler,
 			    SLJIT_MOV_UI,
 			    SLJIT_MEM1(SLJIT_LOCALS_REG),
@@ -1454,7 +1453,7 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 		}
 	}
 
-	if (opts & BPFJIT_INIT_A) {
+	if (initmask & BJ_INIT_ABIT) {
 		/* A = 0; */
 		status = sljit_emit_op1(compiler,
 		    SLJIT_MOV,
@@ -1464,7 +1463,7 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 			goto fail;
 	}
 
-	if (opts & BPFJIT_INIT_X) {
+	if (initmask & BJ_INIT_XBIT) {
 		/* X = 0; */
 		status = sljit_emit_op1(compiler,
 		    SLJIT_MOV,
