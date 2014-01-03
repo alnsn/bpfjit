@@ -69,7 +69,7 @@
 /*
  * Permanent register assignments.
  */
-#define BJ_BUF	SLJIT_SAVED_REG1
+#define BJ_BUF		SLJIT_SAVED_REG1
 //#define BJ_ARGS  	SLJIT_SAVED_REG2
 #define BJ_BUFLEN	SLJIT_SAVED_REG3
 #define BJ_AREG		SLJIT_SCRATCH_REG1
@@ -82,8 +82,8 @@
  * EREG registers can't be used for indirect calls, reuse BJ_BUF and
  * BJ_BUFLEN registers. They can be easily restored from BJ_ARGS.
  */
-#define BJ_COPFUNCS_PTR	SLJIT_SAVED_REG1
-#define BJ_COPFUNCS_IDX	SLJIT_SAVED_REG3
+#define BJ_COPF_PTR	SLJIT_SAVED_REG1
+#define BJ_COPF_IDX	SLJIT_SAVED_REG3
 
 typedef unsigned int bpfjit_init_mask_t;
 #define BJ_INIT_NOBITS  0u
@@ -540,8 +540,8 @@ emit_cop(struct sljit_compiler* compiler, bpf_ctx_t *bc, struct bpf_insn *pc,
     BJ_XREG == SLJIT_SCRATCH_REG1     || \
     BJ_XREG == SLJIT_SCRATCH_REG2     || \
     BJ_XREG == SLJIT_SCRATCH_REG3     || \
-    BJ_COPFUNCS_PTR == BJ_ARGS || \
-    BJ_COPFUNCS_IDX	== BJ_ARGS
+    BJ_COPF_PTR == BJ_ARGS            || \
+    BJ_COPF_IDX	== BJ_ARGS
 #error "Not supported assignment of registers."
 #endif
 
@@ -623,7 +623,7 @@ emit_cop(struct sljit_compiler* compiler, bpf_ctx_t *bc, struct bpf_insn *pc,
 		/* load ctx->copfuncs */
 		status = sljit_emit_op1(compiler,
 		    SLJIT_MOV_P,
-		    BJ_COPFUNCS_PTR, 0,
+		    BJ_COPF_PTR, 0,
 		    SLJIT_MEM1(SLJIT_SCRATCH_REG1),
 		    offsetof(struct bpf_ctx, copfuncs));
 		if (status != SLJIT_SUCCESS)
@@ -635,14 +635,14 @@ emit_cop(struct sljit_compiler* compiler, bpf_ctx_t *bc, struct bpf_insn *pc,
 		 */
 		status = sljit_emit_op1(compiler,
 		    SLJIT_MOV_P,
-		    BJ_COPFUNCS_IDX, 0,
+		    BJ_COPF_IDX, 0,
 		    BJ_XREG, 0);
 		if (status != SLJIT_SUCCESS)
 			return status;
 
 		status = sljit_emit_ijump(compiler,
 		    SLJIT_CALL3,
-		    SLJIT_MEM2(BJ_COPFUNCS_PTR, BJ_COPFUNCS_IDX),
+		    SLJIT_MEM2(BJ_COPF_PTR, BJ_COPF_IDX),
 		    SLJIT_WORD_SHIFT);
 		if (status != SLJIT_SUCCESS)
 			return status;
@@ -1067,8 +1067,6 @@ set_check_length(struct bpf_insn *insns, struct bpfjit_insn_data *insn_dat,
 }
 
 /*
- * XXX nscratches.
- *
  * The function divides instructions into blocks. Destination of a jump
  * instruction starts a new block. BPF_RET and BPF_JMP instructions
  * terminate a block. Blocks are linear, that is, there are no jumps out
@@ -1086,7 +1084,7 @@ set_check_length(struct bpf_insn *insns, struct bpfjit_insn_data *insn_dat,
 static bool
 optimize1(struct bpf_insn *insns,
     struct bpfjit_insn_data *insn_dat, size_t insn_count,
-    bpfjit_init_mask_t *initmask)
+    bpfjit_init_mask_t *initmask, int *nscratches, bool *cop)
 {
 	struct bpfjit_jump *jmp, *jtf;
 	size_t i;
@@ -1097,6 +1095,8 @@ optimize1(struct bpf_insn *insns,
 	bool break_block, jump_dst, unreachable;
 
 	*initmask = BJ_INIT_NOBITS;
+	*nscratches = 2;
+	*cop = false;
 
 	for (i = 0; i < insn_count; i++) {
 		insn_dat[i].bj_invalid = BJ_INIT_NOBITS;
@@ -1151,6 +1151,20 @@ optimize1(struct bpf_insn *insns,
 			continue;
 
 		case BPF_LD:
+			if (BPF_MODE(insns[i].code) == BPF_IND ||
+			    BPF_MODE(insns[i].code) == BPF_ABS) {
+				if (BPF_MODE(insns[i].code) == BPF_IND &&
+				    *nscratches < 4) {
+					/* uses BJ_XREG */
+					*nscratches = 4;
+				}
+				if (*nscratches < 3 &&
+				    read_width(&insns[i]) == 4) {
+					/* uses BJ_TMP2REG */
+					*nscratches = 3;
+				}
+			}
+
 			if (BPF_MODE(insns[i].code) == BPF_IND)
 				*initmask |= invalid & BJ_INIT_XBIT;
 
@@ -1163,6 +1177,14 @@ optimize1(struct bpf_insn *insns,
 			continue;
 
 		case BPF_LDX:
+#if defined(_KERNEL)
+			/* uses BJ_TMP3REG */
+			*nscratches = 5;
+#endif
+			/* uses BJ_XREG */
+			if (*nscratches < 4)
+				*nscratches = 4;
+
 			if (BPF_MODE(insns[i].code) == BPF_MEM &&
 			    (uint32_t)insns[i].k < BPF_MEMWORDS) {
 				*initmask |= invalid & BJ_INIT_MBIT(insns[i].k);
@@ -1180,6 +1202,10 @@ optimize1(struct bpf_insn *insns,
 			continue;
 
 		case BPF_STX:
+			/* uses BJ_XREG */
+			if (*nscratches < 4)
+				*nscratches = 4;
+
 			*initmask |= invalid & BJ_INIT_XBIT;
 
 			if ((uint32_t)insns[i].k < BPF_MEMWORDS)
@@ -1193,6 +1219,10 @@ optimize1(struct bpf_insn *insns,
 			if (insns[i].code != (BPF_ALU|BPF_NEG) &&
 			    BPF_SRC(insns[i].code) == BPF_X) {
 				*initmask |= invalid & BJ_INIT_XBIT;
+				/* uses BJ_XREG */
+				if (*nscratches < 4)
+					*nscratches = 4;
+
 			}
 
 			invalid &= ~BJ_INIT_ABIT;
@@ -1201,17 +1231,35 @@ optimize1(struct bpf_insn *insns,
 		case BPF_MISC:
 			switch (BPF_MISCOP(insns[i].code)) {
 			case BPF_TAX: // X <- A
+				/* uses BJ_XREG */
+				if (*nscratches < 4)
+					*nscratches = 4;
+
 				*initmask |= invalid & BJ_INIT_ABIT;
 				invalid &= ~BJ_INIT_XBIT;
 				continue;
 
 			case BPF_TXA: // A <- X
+				/* uses BJ_XREG */
+				if (*nscratches < 4)
+					*nscratches = 4;
+
 				*initmask |= invalid & BJ_INIT_XBIT;
 				invalid &= ~BJ_INIT_ABIT;
 				continue;
 
 			case BPF_COP:
+				/* call copfunc with three arguments */
+				if (*nscratches < 3)
+					*nscratches = 3;
+				/* FALLTHROUGH */
+
 			case BPF_COPX:
+				/* uses BJ_XREG */
+				if (*nscratches < 4)
+					*nscratches = 4;
+			
+				*cop = true;
 				*initmask |= invalid & BJ_INIT_ABIT;
 				invalid &= ~BJ_INIT_ABIT;
 				// XXX Tweak MBITs.
@@ -1356,18 +1404,23 @@ bpfjit_function_t
 bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 {
 	void *rv;
+	struct sljit_compiler *compiler;
+
 	size_t i;
 	int status;
 	int branching, negate;
 	unsigned int rval, mode, src;
+
+	/* optimization related */
 	bpfjit_init_mask_t initmask;
-	struct bpf_insn *pc;
-	struct sljit_compiler* compiler;
+	int nscratches;
+	bool cop;
 
 	/* a list of jumps to out-of-bound return from a generated function */
 	struct sljit_jump **ret0;
 	size_t ret0_size, ret0_maxsize;
 
+	struct bpf_insn *pc;
 	struct bpfjit_insn_data *insn_dat;
 
 	/* for local use */
@@ -1391,8 +1444,10 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 	if (insn_dat == NULL)
 		goto fail;
 
-	if (!optimize1(insns, insn_dat, insn_count, &initmask))
+	if (!optimize1(insns, insn_dat, insn_count,
+	    &initmask, &nscratches, &cop)) {
 		goto fail;
+	}
 
 #if defined(_KERNEL)
 	/* bpf_filter() checks initialization of memwords. */
@@ -1414,18 +1469,20 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 #endif
 
 	status = sljit_emit_enter(compiler,
-	    2, 5, 3, sizeof(struct bpfjit_stack));
+	    2, nscratches, 3, sizeof(struct bpfjit_stack));
 	if (status != SLJIT_SUCCESS)
 		goto fail;
 
-	/* save ctx argument */
-	status = sljit_emit_op1(compiler,
-	    SLJIT_MOV_P,
-	    SLJIT_MEM1(SLJIT_LOCALS_REG),
-	    offsetof(struct bpfjit_stack, ctx),
-	    BJ_CTX_ARG, 0);
-	if (status != SLJIT_SUCCESS)
-		goto fail;
+	if (cop) {
+		/* save ctx argument */
+		status = sljit_emit_op1(compiler,
+		    SLJIT_MOV_P,
+		    SLJIT_MEM1(SLJIT_LOCALS_REG),
+		    offsetof(struct bpfjit_stack, ctx),
+		    BJ_CTX_ARG, 0);
+		if (status != SLJIT_SUCCESS)
+			goto fail;
+	}
 
 	status = load_buf_buflen(compiler);
 	if (status != SLJIT_SUCCESS)
@@ -1663,7 +1720,6 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 			continue;
 
 		case BPF_ALU:
-
 			if (pc->code == (BPF_ALU|BPF_NEG)) {
 				status = sljit_emit_op1(compiler,
 				    SLJIT_NEG,
@@ -1732,7 +1788,6 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 			continue;
 
 		case BPF_JMP:
-
 			if (pc->code == (BPF_JMP|BPF_JA)) {
 				jt = jf = pc->k;
 			} else {
@@ -1784,7 +1839,6 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 			continue;
 
 		case BPF_RET:
-
 			rval = BPF_RVAL(pc->code);
 			if (rval == BPF_X)
 				goto fail;
@@ -1810,7 +1864,6 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 			continue;
 
 		case BPF_MISC:
-
 			switch (BPF_MISCOP(pc->code)) {
 			case BPF_TAX:
 				status = sljit_emit_op1(compiler,
