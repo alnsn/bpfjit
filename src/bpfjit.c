@@ -536,11 +536,11 @@ static int
 emit_cop(struct sljit_compiler* compiler, bpf_ctx_t *bc, struct bpf_insn *pc,
     struct sljit_jump **ret0_jump)
 {
-#if BJ_XREG == SLJIT_RETURN_REG       || \
-    BJ_XREG == SLJIT_SCRATCH_REG1     || \
-    BJ_XREG == SLJIT_SCRATCH_REG2     || \
-    BJ_XREG == SLJIT_SCRATCH_REG3     || \
-    BJ_COPF_PTR == BJ_ARGS            || \
+#if BJ_XREG == SLJIT_RETURN_REG   || \
+    BJ_XREG == SLJIT_SCRATCH_REG1 || \
+    BJ_XREG == SLJIT_SCRATCH_REG2 || \
+    BJ_XREG == SLJIT_SCRATCH_REG3 || \
+    BJ_COPF_PTR == BJ_ARGS        || \
     BJ_COPF_IDX	== BJ_ARGS
 #error "Not supported assignment of registers."
 #endif
@@ -1084,7 +1084,7 @@ set_check_length(struct bpf_insn *insns, struct bpfjit_insn_data *insn_dat,
 static bool
 optimize1(struct bpf_insn *insns,
     struct bpfjit_insn_data *insn_dat, size_t insn_count,
-    bpfjit_init_mask_t *initmask, int *nscratches, bool *cop)
+    bpfjit_init_mask_t *initmask, int *nscratches, int *ncopfuncs)
 {
 	struct bpfjit_jump *jmp, *jtf;
 	size_t i;
@@ -1096,7 +1096,7 @@ optimize1(struct bpf_insn *insns,
 
 	*initmask = BJ_INIT_NOBITS;
 	*nscratches = 2;
-	*cop = false;
+	*ncopfuncs = 0;
 
 	for (i = 0; i < insn_count; i++) {
 		insn_dat[i].bj_invalid = BJ_INIT_NOBITS;
@@ -1248,18 +1248,18 @@ optimize1(struct bpf_insn *insns,
 				invalid &= ~BJ_INIT_ABIT;
 				continue;
 
-			case BPF_COP:
-				/* call copfunc with three arguments */
-				if (*nscratches < 3)
-					*nscratches = 3;
-				/* FALLTHROUGH */
-
 			case BPF_COPX:
 				/* uses BJ_XREG */
 				if (*nscratches < 4)
 					*nscratches = 4;
+				/* FALLTHROUGH */
+
+			case BPF_COP:
+				/* calls copfunc with three arguments */
+				if (*nscratches < 3)
+					*nscratches = 3;
 			
-				*cop = true;
+				(*ncopfuncs)++;
 				*initmask |= invalid & BJ_INIT_ABIT;
 				invalid &= ~BJ_INIT_ABIT;
 				// XXX Tweak MBITs.
@@ -1413,8 +1413,7 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 
 	/* optimization related */
 	bpfjit_init_mask_t initmask;
-	int nscratches;
-	bool cop;
+	int nscratches, ncopfuncs;
 
 	/* a list of jumps to out-of-bound return from a generated function */
 	struct sljit_jump **ret0;
@@ -1445,7 +1444,7 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 		goto fail;
 
 	if (!optimize1(insns, insn_dat, insn_count,
-	    &initmask, &nscratches, &cop)) {
+	    &initmask, &nscratches, &ncopfuncs)) {
 		goto fail;
 	}
 
@@ -1473,7 +1472,7 @@ bpfjit_generate_code(bpf_ctx_t *bc, struct bpf_insn *insns, size_t insn_count)
 	if (status != SLJIT_SUCCESS)
 		goto fail;
 
-	if (cop) {
+	if (ncopfuncs > 0) {
 		/* save ctx argument */
 		status = sljit_emit_op1(compiler,
 		    SLJIT_MOV_P,
