@@ -1067,6 +1067,24 @@ set_check_length(struct bpf_insn *insns, struct bpfjit_insn_data *insn_dat,
 }
 
 /*
+ * Get safe length for a jump destication.
+ */
+static uint32_t
+get_safe_length(struct bpfjit_insn_data *insn_dat)
+{
+	struct bpfjit_jump *jmp;
+	uint32_t rv;
+
+	rv = UINT32_MAX;
+	SLIST_FOREACH(jmp, &insn_dat->bj_jumps, bj_entries) {
+		if (jmp->bj_safe_length < rv)
+			rv = jmp->bj_safe_length;
+	}
+
+	return rv;
+}
+
+/*
  * The function divides instructions into blocks. Destination of a jump
  * instruction starts a new block. BPF_RET and BPF_JMP instructions
  * terminate a block. Blocks are linear, that is, there are no jumps out
@@ -1086,7 +1104,7 @@ optimize1(struct bpf_insn *insns,
     struct bpfjit_insn_data *insn_dat, size_t insn_count,
     bpfjit_init_mask_t *initmask, int *nscratches, int *ncopfuncs)
 {
-	struct bpfjit_jump *jmp, *jtf;
+	struct bpfjit_jump *jtf;
 	size_t i;
 	size_t first_read;
 	uint32_t jt, jf;
@@ -1122,11 +1140,7 @@ optimize1(struct bpf_insn *insns,
 			first_read = SIZE_MAX;
 
 			if (jump_dst)
-				safe_length = UINT32_MAX;
-			SLIST_FOREACH(jmp, &insn_dat[i].bj_jumps, bj_entries) {
-				if (jmp->bj_safe_length < safe_length)
-					safe_length = jmp->bj_safe_length;
-			}
+				safe_length = get_safe_length(&insn_dat[i]);
 		}
 
 		insn_dat[i].bj_unreachable = unreachable;
