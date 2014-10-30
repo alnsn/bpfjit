@@ -2,7 +2,7 @@ language: c
 compiler:
   - gcc
   - clang
-before_script: svn co 'https://svn.code.sf.net/p/sljit/code@r220' sljit/sljit
+before_script: svn co 'https://svn.code.sf.net/p/sljit/code@r220' sljit/sljit && curl 'http://www.opensource.apple.com/source/libpcap/libpcap-16/libpcap/pcap-bpf.h?txt' -o pcap-bpf.h
 script: make -C src/
 
 env:
@@ -17,6 +17,6 @@ addons:
       name: "alnsn/bpfjit"
       description: "Build submitted via Travis CI"
     notification_email: alnsn@yandex.ru
-    build_command_prepend: "svn co 'https://svn.code.sf.net/p/sljit/code@r220' sljit/sljit"
+    build_command_prepend: "svn co 'https://svn.code.sf.net/p/sljit/code@r220' sljit/sljit" && curl 'http://www.opensource.apple.com/source/libpcap/libpcap-16/libpcap/pcap-bpf.h?txt' -o pcap-bpf.h"
     build_command:   "make -C src/"
     branch_pattern: master
