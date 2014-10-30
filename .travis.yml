@@ -1,0 +1,6 @@
+language: c
+compiler:
+  - gcc
+  - clang
+before_script: svn co https://sljit.svn.sourceforge.net/svnroot/sljit@r220 sljit/sljit
+script: make -C src/
