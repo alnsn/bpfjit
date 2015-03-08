@@ -32,8 +32,6 @@
 #include <sys/cdefs.h>
 #ifdef _KERNEL
 __KERNEL_RCSID(0, "$NetBSD: bpfjit.c,v 1.43 2015/02/14 21:32:46 alnsn Exp $");
-#else
-__RCSID("$NetBSD: bpfjit.c,v 1.43 2015/02/14 21:32:46 alnsn Exp $");
 #endif
 
 #include <sys/types.h>
