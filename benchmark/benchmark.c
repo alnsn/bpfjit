@@ -27,6 +27,7 @@
  * SUCH DAMAGE.
  */
 
+#define __BPF_PRIVATE
 #include <bpfjit.h>
 
 #include <err.h>
@@ -36,14 +37,27 @@
 #include <stdlib.h>
 
 
-size_t filter_pkt(bpf_ctx_t *, bpf_args_t *);
+unsigned int filter_pkt(const bpf_ctx_t *, bpf_args_t *);
 
 void usage(const char *prog);
 void test_bpf_filter(size_t counter, size_t dummy);
 
 void
-test_fun(bpfjit_function_t fun, const uint8_t *pkt,
+test_fun(bpfjit_func_t fun, const uint8_t *pkt,
     unsigned int pktsize, size_t counter, size_t dummy, const char*msg);
+
+static uint32_t
+dummy_copfunc(const bpf_ctx_t *bc, bpf_args_t *args, uint32_t A)
+{
+
+	return 0;
+}
+
+static const bpf_copfunc_t copfuncs[] = {
+	&dummy_copfunc
+};
+
+static bpf_ctx_t ctx = { copfuncs, sizeof(copfuncs) / sizeof(copfuncs[0]) };
 
 /*
  * From bpf(4): This filter accepts only IP packets between host
@@ -70,17 +84,28 @@ static uint8_t test_pkt[128] = {
 	0x80, 0x03, 0x70, 0x23
 };
 
+static inline
+unsigned int jitcall(bpfjit_func_t fn,
+    const uint8_t *pkt, unsigned int wirelen, unsigned int buflen)
+{
+	bpf_args_t args;
 
+	args.pkt = pkt;
+	args.wirelen = wirelen;
+	args.buflen = buflen;
+
+	return fn(NULL, &args);
+}
 
 void
-test_fun(bpfjit_function_t fun, const uint8_t *pkt,
+test_fun(bpfjit_func_t fun, const uint8_t *pkt,
     unsigned int pktsize, size_t counter, size_t dummy, const char*msg)
 {
 	size_t i;
 	unsigned int ret = 0;
 
 	for (i = 0; i < counter; i++)
-		ret += bpfjit_call(fun, pkt, pktsize, pktsize);
+		ret += jitcall(fun, pkt, pktsize, pktsize);
 
 	if (counter == dummy)
 		printf("%s returned %u\n", msg, ret);
@@ -98,9 +123,9 @@ static void
 test_bpfjit(size_t counter, const uint8_t *pkt,
     unsigned int pktsize, size_t dummy)
 {
-	bpfjit_function_t code;
+	bpfjit_func_t code;
 
-	code = bpfjit_generate_code(NULL, insns,
+	code = bpfjit_generate_code(&ctx, insns,
 	    sizeof(insns) / sizeof(insns[0]));
 	test_fun(code, pkt, pktsize, counter, dummy, "bpfjit code");
 	bpfjit_free_code(code);

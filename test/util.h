@@ -45,4 +45,17 @@ extern int exit_status;
 	exit_status = EXIT_FAILURE; \
 	warnx("%s:%u (in %s): %s", __FILE__, __LINE__, __func__, #x); }
 
+static inline
+unsigned int jitcall(bpfjit_func_t fn,
+    const uint8_t *pkt, unsigned int wirelen, unsigned int buflen)
+{
+	bpf_args_t args;
+
+	args.pkt = pkt;
+	args.wirelen = wirelen;
+	args.buflen = buflen;
+
+	return fn(NULL, &args);
+}
+
 #endif /* #ifndef BPFJIT_TEST_UTIL_H */

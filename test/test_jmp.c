@@ -46,7 +46,7 @@ test_jmp_ja(void)
 		BPF_STMT(BPF_RET+BPF_K, 3),
 	};
 
-	bpfjit_function_t code;
+	bpfjit_func_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -56,7 +56,7 @@ test_jmp_ja(void)
 	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_call(code, pkt, 1, 1) == UINT32_MAX);
+	CHECK(jitcall(code, pkt, 1, 1) == UINT32_MAX);
 
 	bpfjit_free_code(code);
 }
@@ -84,7 +84,7 @@ test_jmp_gt_k(void)
 		BPF_STMT(BPF_RET+BPF_K, 8)
 	};
 
-	bpfjit_function_t code;
+	bpfjit_func_t code;
 	uint8_t pkt[8]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -94,14 +94,14 @@ test_jmp_gt_k(void)
 	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_call(code, pkt, 1, 1) == 1);
-	CHECK(bpfjit_call(code, pkt, 2, 2) == 1);
-	CHECK(bpfjit_call(code, pkt, 3, 3) == 7);
-	CHECK(bpfjit_call(code, pkt, 4, 4) == 7);
-	CHECK(bpfjit_call(code, pkt, 5, 5) == 7);
-	CHECK(bpfjit_call(code, pkt, 6, 6) == 8);
-	CHECK(bpfjit_call(code, pkt, 7, 7) == 5);
-	CHECK(bpfjit_call(code, pkt, 8, 8) == 0);
+	CHECK(jitcall(code, pkt, 1, 1) == 1);
+	CHECK(jitcall(code, pkt, 2, 2) == 1);
+	CHECK(jitcall(code, pkt, 3, 3) == 7);
+	CHECK(jitcall(code, pkt, 4, 4) == 7);
+	CHECK(jitcall(code, pkt, 5, 5) == 7);
+	CHECK(jitcall(code, pkt, 6, 6) == 8);
+	CHECK(jitcall(code, pkt, 7, 7) == 5);
+	CHECK(jitcall(code, pkt, 8, 8) == 0);
 
 	bpfjit_free_code(code);
 }
@@ -129,7 +129,7 @@ test_jmp_ge_k(void)
 		BPF_STMT(BPF_RET+BPF_K, 8)
 	};
 
-	bpfjit_function_t code;
+	bpfjit_func_t code;
 	uint8_t pkt[8]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -139,14 +139,14 @@ test_jmp_ge_k(void)
 	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_call(code, pkt, 1, 1) == 1);
-	CHECK(bpfjit_call(code, pkt, 2, 2) == 1);
-	CHECK(bpfjit_call(code, pkt, 3, 3) == 7);
-	CHECK(bpfjit_call(code, pkt, 4, 4) == 7);
-	CHECK(bpfjit_call(code, pkt, 5, 5) == 7);
-	CHECK(bpfjit_call(code, pkt, 6, 6) == 8);
-	CHECK(bpfjit_call(code, pkt, 7, 7) == 5);
-	CHECK(bpfjit_call(code, pkt, 8, 8) == 0);
+	CHECK(jitcall(code, pkt, 1, 1) == 1);
+	CHECK(jitcall(code, pkt, 2, 2) == 1);
+	CHECK(jitcall(code, pkt, 3, 3) == 7);
+	CHECK(jitcall(code, pkt, 4, 4) == 7);
+	CHECK(jitcall(code, pkt, 5, 5) == 7);
+	CHECK(jitcall(code, pkt, 6, 6) == 8);
+	CHECK(jitcall(code, pkt, 7, 7) == 5);
+	CHECK(jitcall(code, pkt, 8, 8) == 0);
 
 	bpfjit_free_code(code);
 }
@@ -174,7 +174,7 @@ test_jmp_eq_k(void)
 		BPF_STMT(BPF_RET+BPF_K, 8)
 	};
 
-	bpfjit_function_t code;
+	bpfjit_func_t code;
 	uint8_t pkt[8]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -184,14 +184,14 @@ test_jmp_eq_k(void)
 	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_call(code, pkt, 1, 1) == 7);
-	CHECK(bpfjit_call(code, pkt, 2, 2) == 7);
-	CHECK(bpfjit_call(code, pkt, 3, 3) == 1);
-	CHECK(bpfjit_call(code, pkt, 4, 4) == 7);
-	CHECK(bpfjit_call(code, pkt, 5, 5) == 7);
-	CHECK(bpfjit_call(code, pkt, 6, 6) == 8);
-	CHECK(bpfjit_call(code, pkt, 7, 7) == 5);
-	CHECK(bpfjit_call(code, pkt, 8, 8) == 0);
+	CHECK(jitcall(code, pkt, 1, 1) == 7);
+	CHECK(jitcall(code, pkt, 2, 2) == 7);
+	CHECK(jitcall(code, pkt, 3, 3) == 1);
+	CHECK(jitcall(code, pkt, 4, 4) == 7);
+	CHECK(jitcall(code, pkt, 5, 5) == 7);
+	CHECK(jitcall(code, pkt, 6, 6) == 8);
+	CHECK(jitcall(code, pkt, 7, 7) == 5);
+	CHECK(jitcall(code, pkt, 8, 8) == 0);
 
 	bpfjit_free_code(code);
 }
@@ -230,7 +230,7 @@ test_jmp_modulo_k(void)
 		BPF_STMT(BPF_RET+BPF_K, 7)
 	};
 
-	bpfjit_function_t code;
+	bpfjit_func_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -240,7 +240,7 @@ test_jmp_modulo_k(void)
 	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_call(code, pkt, 1, 1) == UINT32_MAX);
+	CHECK(jitcall(code, pkt, 1, 1) == UINT32_MAX);
 
 	bpfjit_free_code(code);
 }
@@ -268,7 +268,7 @@ test_jmp_jset_k(void)
 		BPF_STMT(BPF_RET+BPF_K, 8)
 	};
 
-	bpfjit_function_t code;
+	bpfjit_func_t code;
 	uint8_t pkt[8]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -278,14 +278,14 @@ test_jmp_jset_k(void)
 	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_call(code, pkt, 1, 1) == 1);
-	CHECK(bpfjit_call(code, pkt, 2, 2) == 1);
-	CHECK(bpfjit_call(code, pkt, 3, 3) == 1);
-	CHECK(bpfjit_call(code, pkt, 4, 4) == 7);
-	CHECK(bpfjit_call(code, pkt, 5, 5) == 5);
-	CHECK(bpfjit_call(code, pkt, 6, 6) == 8);
-	CHECK(bpfjit_call(code, pkt, 7, 7) == 5);
-	CHECK(bpfjit_call(code, pkt, 8, 8) == 0);
+	CHECK(jitcall(code, pkt, 1, 1) == 1);
+	CHECK(jitcall(code, pkt, 2, 2) == 1);
+	CHECK(jitcall(code, pkt, 3, 3) == 1);
+	CHECK(jitcall(code, pkt, 4, 4) == 7);
+	CHECK(jitcall(code, pkt, 5, 5) == 5);
+	CHECK(jitcall(code, pkt, 6, 6) == 8);
+	CHECK(jitcall(code, pkt, 7, 7) == 5);
+	CHECK(jitcall(code, pkt, 8, 8) == 0);
 
 	bpfjit_free_code(code);
 }
@@ -320,7 +320,7 @@ test_jmp_gt_x(void)
 		BPF_STMT(BPF_RET+BPF_K, 8)
 	};
 
-	bpfjit_function_t code;
+	bpfjit_func_t code;
 	uint8_t pkt[8]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -330,14 +330,14 @@ test_jmp_gt_x(void)
 	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_call(code, pkt, 1, 1) == 1);
-	CHECK(bpfjit_call(code, pkt, 2, 2) == 1);
-	CHECK(bpfjit_call(code, pkt, 3, 3) == 7);
-	CHECK(bpfjit_call(code, pkt, 4, 4) == 7);
-	CHECK(bpfjit_call(code, pkt, 5, 5) == 7);
-	CHECK(bpfjit_call(code, pkt, 6, 6) == 8);
-	CHECK(bpfjit_call(code, pkt, 7, 7) == 5);
-	CHECK(bpfjit_call(code, pkt, 8, 8) == 0);
+	CHECK(jitcall(code, pkt, 1, 1) == 1);
+	CHECK(jitcall(code, pkt, 2, 2) == 1);
+	CHECK(jitcall(code, pkt, 3, 3) == 7);
+	CHECK(jitcall(code, pkt, 4, 4) == 7);
+	CHECK(jitcall(code, pkt, 5, 5) == 7);
+	CHECK(jitcall(code, pkt, 6, 6) == 8);
+	CHECK(jitcall(code, pkt, 7, 7) == 5);
+	CHECK(jitcall(code, pkt, 8, 8) == 0);
 
 	bpfjit_free_code(code);
 }
@@ -372,7 +372,7 @@ test_jmp_ge_x(void)
 		BPF_STMT(BPF_RET+BPF_K, 8)
 	};
 
-	bpfjit_function_t code;
+	bpfjit_func_t code;
 	uint8_t pkt[8]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -382,14 +382,14 @@ test_jmp_ge_x(void)
 	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_call(code, pkt, 1, 1) == 1);
-	CHECK(bpfjit_call(code, pkt, 2, 2) == 1);
-	CHECK(bpfjit_call(code, pkt, 3, 3) == 7);
-	CHECK(bpfjit_call(code, pkt, 4, 4) == 7);
-	CHECK(bpfjit_call(code, pkt, 5, 5) == 7);
-	CHECK(bpfjit_call(code, pkt, 6, 6) == 8);
-	CHECK(bpfjit_call(code, pkt, 7, 7) == 5);
-	CHECK(bpfjit_call(code, pkt, 8, 8) == 0);
+	CHECK(jitcall(code, pkt, 1, 1) == 1);
+	CHECK(jitcall(code, pkt, 2, 2) == 1);
+	CHECK(jitcall(code, pkt, 3, 3) == 7);
+	CHECK(jitcall(code, pkt, 4, 4) == 7);
+	CHECK(jitcall(code, pkt, 5, 5) == 7);
+	CHECK(jitcall(code, pkt, 6, 6) == 8);
+	CHECK(jitcall(code, pkt, 7, 7) == 5);
+	CHECK(jitcall(code, pkt, 8, 8) == 0);
 
 	bpfjit_free_code(code);
 }
@@ -423,7 +423,7 @@ test_jmp_eq_x(void)
 		BPF_STMT(BPF_RET+BPF_K, 8)
 	};
 
-	bpfjit_function_t code;
+	bpfjit_func_t code;
 	uint8_t pkt[8]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -433,14 +433,14 @@ test_jmp_eq_x(void)
 	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_call(code, pkt, 1, 1) == 7);
-	CHECK(bpfjit_call(code, pkt, 2, 2) == 7);
-	CHECK(bpfjit_call(code, pkt, 3, 3) == 1);
-	CHECK(bpfjit_call(code, pkt, 4, 4) == 7);
-	CHECK(bpfjit_call(code, pkt, 5, 5) == 7);
-	CHECK(bpfjit_call(code, pkt, 6, 6) == 8);
-	CHECK(bpfjit_call(code, pkt, 7, 7) == 5);
-	CHECK(bpfjit_call(code, pkt, 8, 8) == 0);
+	CHECK(jitcall(code, pkt, 1, 1) == 7);
+	CHECK(jitcall(code, pkt, 2, 2) == 7);
+	CHECK(jitcall(code, pkt, 3, 3) == 1);
+	CHECK(jitcall(code, pkt, 4, 4) == 7);
+	CHECK(jitcall(code, pkt, 5, 5) == 7);
+	CHECK(jitcall(code, pkt, 6, 6) == 8);
+	CHECK(jitcall(code, pkt, 7, 7) == 5);
+	CHECK(jitcall(code, pkt, 8, 8) == 0);
 
 	bpfjit_free_code(code);
 }
@@ -474,7 +474,7 @@ test_jmp_jset_x(void)
 		BPF_STMT(BPF_RET+BPF_K, 8)
 	};
 
-	bpfjit_function_t code;
+	bpfjit_func_t code;
 	uint8_t pkt[8]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -484,14 +484,14 @@ test_jmp_jset_x(void)
 	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_call(code, pkt, 1, 1) == 1);
-	CHECK(bpfjit_call(code, pkt, 2, 2) == 1);
-	CHECK(bpfjit_call(code, pkt, 3, 3) == 1);
-	CHECK(bpfjit_call(code, pkt, 4, 4) == 7);
-	CHECK(bpfjit_call(code, pkt, 5, 5) == 5);
-	CHECK(bpfjit_call(code, pkt, 6, 6) == 8);
-	CHECK(bpfjit_call(code, pkt, 7, 7) == 5);
-	CHECK(bpfjit_call(code, pkt, 8, 8) == 0);
+	CHECK(jitcall(code, pkt, 1, 1) == 1);
+	CHECK(jitcall(code, pkt, 2, 2) == 1);
+	CHECK(jitcall(code, pkt, 3, 3) == 1);
+	CHECK(jitcall(code, pkt, 4, 4) == 7);
+	CHECK(jitcall(code, pkt, 5, 5) == 5);
+	CHECK(jitcall(code, pkt, 6, 6) == 8);
+	CHECK(jitcall(code, pkt, 7, 7) == 5);
+	CHECK(jitcall(code, pkt, 8, 8) == 0);
 
 	bpfjit_free_code(code);
 }
@@ -540,7 +540,7 @@ test_jmp_modulo_x(void)
 		BPF_STMT(BPF_RET+BPF_K, 7)
 	};
 
-	bpfjit_function_t code;
+	bpfjit_func_t code;
 	uint8_t pkt[1]; /* the program doesn't read any data */
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
@@ -550,7 +550,7 @@ test_jmp_modulo_x(void)
 	code = bpfjit_generate_code(NULL, insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(bpfjit_call(code, pkt, 1, 1) == UINT32_MAX);
+	CHECK(jitcall(code, pkt, 1, 1) == UINT32_MAX);
 
 	bpfjit_free_code(code);
 }

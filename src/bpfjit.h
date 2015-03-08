@@ -52,50 +52,24 @@
 struct bpf_ctx;
 typedef struct bpf_ctx bpf_ctx_t;
 
-struct bpf_state;
-typedef struct bpf_state bpf_state_t;
+#ifndef BPF_COP_EXTMEM_RELEASE
+#include "bpf-compat.h"
+#endif
 
-struct bpf_args;
-typedef struct bpf_args bpf_args_t;
+typedef unsigned int (*bpfjit_func_t)(const bpf_ctx_t *, bpf_args_t *);
 
-typedef uint32_t (*bpf_copfunc_t)(bpf_ctx_t *, bpf_args_t *, bpf_state_t *);
+bpfjit_func_t bpfjit_generate_code(const bpf_ctx_t *,
+    const struct bpf_insn *, size_t);
+void bpfjit_free_code(bpfjit_func_t);
 
-struct bpf_args {
-	const uint8_t *	pkt;
-	size_t		wirelen;
-	size_t		buflen;
-	void *		arg;
+#ifdef _KERNEL
+struct bpfjit_ops {
+	bpfjit_func_t (*bj_generate_code)(const bpf_ctx_t *,
+	    const struct bpf_insn *, size_t);
+	void (*bj_free_code)(bpfjit_func_t);
 };
 
-struct bpf_ctx {
-	const bpf_copfunc_t *	copfuncs;
-	size_t			nfuncs;
-};
-
-struct bpf_state {
-	uint32_t	mem[BPF_MEMWORDS];
-	uint32_t	regA;
-};
-
-typedef size_t (*bpfjit_function_t)(bpf_ctx_t *, bpf_args_t *);
-
-bpfjit_function_t
-bpfjit_generate_code(bpf_ctx_t *, struct bpf_insn *, size_t);
-
-void
-bpfjit_free_code(bpfjit_function_t code);
-
-static inline size_t
-bpfjit_call(bpfjit_function_t f, const uint8_t *p,
-    unsigned int wirelen, unsigned int buflen)
-{
-	bpf_args_t args;
-	
-	args.pkt = p;
-	args.wirelen = wirelen;
-	args.buflen = buflen;
-
-	return f(NULL, &args);
-}
+extern struct bpfjit_ops bpfjit_module_ops;
+#endif
 
 #endif /* !_NET_BPFJIT_H_ */

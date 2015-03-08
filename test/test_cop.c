@@ -27,6 +27,7 @@
  * SUCH DAMAGE.
  */
 
+#define __BPF_PRIVATE
 #include <bpfjit.h>
 
 #include <stdbool.h>
@@ -35,36 +36,49 @@
 #include "util.h"
 #include "tests.h"
 
+static uint32_t retA(const bpf_ctx_t *bc, bpf_args_t *args, uint32_t A);
+static uint32_t retBL(const bpf_ctx_t *bc, bpf_args_t *args, uint32_t A);
+static uint32_t retWL(const bpf_ctx_t *bc, bpf_args_t *args, uint32_t A);
+static uint32_t retNF(const bpf_ctx_t *bc, bpf_args_t *args, uint32_t A);
+static uint32_t setARG(const bpf_ctx_t *bc, bpf_args_t *args, uint32_t A);
+
+static const bpf_copfunc_t copfuncs[] = {
+	&retA,
+	&retBL,
+	&retWL,
+	&retNF,
+	&setARG
+};
+
+static const bpf_ctx_t ctx = {
+	.copfuncs = copfuncs,
+	.nfuncs = sizeof(copfuncs) / sizeof(copfuncs[0]),
+	.extwords = 0
+};
+
 static uint32_t
-retA(bpf_ctx_t *bc, bpf_args_t *args, bpf_state_t *state)
+retA(const bpf_ctx_t *bc, bpf_args_t *args, uint32_t A)
 {
 
-	return state->regA;
+	return A;
 }
 
 static uint32_t
-retM(bpf_ctx_t *bc, bpf_args_t *args, bpf_state_t *state)
-{
-
-	return state->mem[(uintptr_t)args->arg];
-}
-
-static uint32_t
-retBL(bpf_ctx_t *bc, bpf_args_t *args, bpf_state_t *state)
+retBL(const bpf_ctx_t *bc, bpf_args_t *args, uint32_t A)
 {
 
 	return args->buflen;
 }
 
 static uint32_t
-retWL(bpf_ctx_t *bc, bpf_args_t *args, bpf_state_t *state)
+retWL(const bpf_ctx_t *bc, bpf_args_t *args, uint32_t A)
 {
 
 	return args->wirelen;
 }
 
 static uint32_t
-retNF(bpf_ctx_t *bc, bpf_args_t *args, bpf_state_t *state)
+retNF(const bpf_ctx_t *bc, bpf_args_t *args, uint32_t A)
 {
 
 	return bc->nfuncs;
@@ -74,7 +88,7 @@ retNF(bpf_ctx_t *bc, bpf_args_t *args, bpf_state_t *state)
  * COP function with a side effect.
  */
 static uint32_t
-setARG(bpf_ctx_t *bc, bpf_args_t *args, bpf_state_t *state)
+setARG(const bpf_ctx_t *bc, bpf_args_t *args, uint32_t A)
 {
 	bool *arg = (bool *)args->arg;
 	bool old = *arg;
@@ -82,17 +96,6 @@ setARG(bpf_ctx_t *bc, bpf_args_t *args, bpf_state_t *state)
 	*arg = true;
 	return old;
 }
-
-static const bpf_copfunc_t copfuncs[] = {
-	&retA,
-	&retM,
-	&retBL,
-	&retWL,
-	&retNF,
-	&setARG
-};
-
-static bpf_ctx_t ctx = { copfuncs, sizeof(copfuncs) / sizeof(copfuncs[0]) };
 
 static void
 test_cop_no_ctx(void)
@@ -102,20 +105,14 @@ test_cop_no_ctx(void)
 		BPF_STMT(BPF_RET+BPF_K, 7)
 	};
 
-	bpfjit_function_t code;
-	uint8_t pkt[1] = { 0 };
-	bpf_args_t args = { pkt, sizeof(pkt), sizeof(pkt) };
+	bpfjit_func_t code;
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	CHECK(bpf_validate(insns, insn_count));
+	//XXX CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(NULL, insns, insn_count);
-	REQUIRE(code != NULL);
-
-	CHECK(code(NULL, &args) == 0);
-
-	bpfjit_free_code(code);
+	REQUIRE(code == NULL);
 }
 
 static void
@@ -127,41 +124,13 @@ test_cop_ret_A(void)
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	bpfjit_function_t code;
+	bpfjit_func_t code;
 	uint8_t pkt[1] = { 0 };
 	bpf_args_t args = { pkt, sizeof(pkt), sizeof(pkt) };
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	CHECK(bpf_validate(insns, insn_count));
-
-	code = bpfjit_generate_code(&ctx, insns, insn_count);
-	REQUIRE(code != NULL);
-
-	CHECK(code(&ctx, &args) == 13);
-
-	bpfjit_free_code(code);
-}
-
-static void
-test_cop_ret_mem(void)
-{
-	static struct bpf_insn insns[] = {
-		BPF_STMT(BPF_LD+BPF_IMM, 13),
-		BPF_STMT(BPF_ST, 3),
-		BPF_STMT(BPF_LD+BPF_IMM, 1),
-		BPF_STMT(BPF_MISC+BPF_COP, 1), // retM
-		BPF_STMT(BPF_RET+BPF_A, 0)
-	};
-
-	bpfjit_function_t code;
-	uint8_t pkt[1] = { 0 };
-	void *arg = (void*)(uintptr_t)3;
-	bpf_args_t args = { pkt, sizeof(pkt), sizeof(pkt), arg };
-
-	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
-
-	CHECK(bpf_validate(insns, insn_count));
+	//CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(&ctx, insns, insn_count);
 	REQUIRE(code != NULL);
@@ -176,17 +145,17 @@ test_cop_ret_buflen(void)
 {
 	static struct bpf_insn insns[] = {
 		BPF_STMT(BPF_LD+BPF_IMM, 13),
-		BPF_STMT(BPF_MISC+BPF_COP, 2), // retBL
+		BPF_STMT(BPF_MISC+BPF_COP, 1), // retBL
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	bpfjit_function_t code;
+	bpfjit_func_t code;
 	uint8_t pkt[1] = { 0 };
 	bpf_args_t args = { pkt, sizeof(pkt), sizeof(pkt) };
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	CHECK(bpf_validate(insns, insn_count));
+	//CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(&ctx, insns, insn_count);
 	REQUIRE(code != NULL);
@@ -201,17 +170,17 @@ test_cop_ret_wirelen(void)
 {
 	static struct bpf_insn insns[] = {
 		BPF_STMT(BPF_LD+BPF_IMM, 13),
-		BPF_STMT(BPF_MISC+BPF_COP, 3), // retWL
+		BPF_STMT(BPF_MISC+BPF_COP, 2), // retWL
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	bpfjit_function_t code;
+	bpfjit_func_t code;
 	uint8_t pkt[1] = { 0 };
 	bpf_args_t args = { pkt, sizeof(pkt), sizeof(pkt) };
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	CHECK(bpf_validate(insns, insn_count));
+	//CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(&ctx, insns, insn_count);
 	REQUIRE(code != NULL);
@@ -226,17 +195,17 @@ test_cop_ret_nfuncs(void)
 {
 	static struct bpf_insn insns[] = {
 		BPF_STMT(BPF_LD+BPF_IMM, 13),
-		BPF_STMT(BPF_MISC+BPF_COP, 4), // retNF
+		BPF_STMT(BPF_MISC+BPF_COP, 3), // retNF
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	bpfjit_function_t code;
+	bpfjit_func_t code;
 	uint8_t pkt[1] = { 0 };
 	bpf_args_t args = { pkt, sizeof(pkt), sizeof(pkt) };
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	CHECK(bpf_validate(insns, insn_count));
+	//CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(&ctx, insns, insn_count);
 	REQUIRE(code != NULL);
@@ -255,19 +224,19 @@ test_cop_mixed_with_ld(void)
 	static struct bpf_insn insns[] = {
 		BPF_STMT(BPF_LD+BPF_IMM, 13),
 		BPF_STMT(BPF_LD+BPF_B+BPF_ABS, 0),
-		BPF_STMT(BPF_MISC+BPF_COP, 5), // setARG
+		BPF_STMT(BPF_MISC+BPF_COP, 4), // setARG
 		BPF_STMT(BPF_LD+BPF_B+BPF_ABS, 99999),
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
-	bpfjit_function_t code;
+	bpfjit_func_t code;
 	bool arg = false;
 	uint8_t pkt[1] = { 0 };
-	bpf_args_t args = { pkt, sizeof(pkt), sizeof(pkt), &arg };
+	bpf_args_t args = { pkt, sizeof(pkt), sizeof(pkt), NULL, &arg };
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	CHECK(bpf_validate(insns, insn_count));
+	//CHECK(bpf_validate(insns, insn_count));
 
 	code = bpfjit_generate_code(&ctx, insns, insn_count);
 	REQUIRE(code != NULL);
@@ -287,20 +256,11 @@ test_cop_invalid_index(void)
 		BPF_STMT(BPF_RET+BPF_K, 27)
 	};
 
-	bpfjit_function_t code;
-	uint8_t pkt[1] = { 0 };
-	bpf_args_t args = { pkt, sizeof(pkt), sizeof(pkt) };
-
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	CHECK(bpf_validate(insns, insn_count));
+	//CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(&ctx, insns, insn_count);
-	REQUIRE(code != NULL);
-
-	CHECK(code(&ctx, &args) == 0);
-
-	bpfjit_free_code(code);
+	REQUIRE(bpfjit_generate_code(&ctx, insns, insn_count) == NULL);
 }
 
 void
@@ -309,7 +269,7 @@ test_cop(void)
 
 	test_cop_no_ctx();
 	test_cop_ret_A();
-	test_cop_ret_mem();
+	//XXX test_cop_ret_mem();
 	test_cop_ret_buflen();
 	test_cop_ret_wirelen();
 	test_cop_ret_nfuncs();

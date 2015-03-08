@@ -1,16 +1,6 @@
 Just-in-Time Compilation for Berkeley Packet Filter
 ===================================================
 
-Disclaimer
-----------
-
-This project is put on hold until March 4, 2015. Up-to-date code
-can be found in the NetBSD tree:
-
-http://cvsweb.netbsd.org/bsdweb.cgi/src/sys/net/bpfjit.h?only_with_tag=MAIN
-http://cvsweb.netbsd.org/bsdweb.cgi/src/sys/net/bpfjit.c?only_with_tag=MAIN
-http://cvsweb.netbsd.org/bsdweb.cgi/src/tests/lib/libbpfjit/?only_with_tag=MAIN
-
 Prerequisites
 -------------
 

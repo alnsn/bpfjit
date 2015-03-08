@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2011-2012 Alexander Nasonov.
+ * Copyright (c) 2014 Alexander Nasonov.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,66 +27,121 @@
  * SUCH DAMAGE.
  */
 
+#define __BPF_PRIVATE
 #include <bpfjit.h>
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "util.h"
 #include "tests.h"
 
+static uint32_t retM(const bpf_ctx_t *bc, bpf_args_t *args, uint32_t A);
+
+static const bpf_copfunc_t copfuncs[] = {
+	&retM
+};
+
+static const bpf_ctx_t ctx = {
+	.copfuncs = copfuncs,
+	.nfuncs = sizeof(copfuncs) / sizeof(copfuncs[0]),
+	.extwords = 4,
+	.preinited = BPF_MEMWORD_INIT(0) | BPF_MEMWORD_INIT(3),
+};
+
+static uint32_t
+retM(const bpf_ctx_t *bc, bpf_args_t *args, uint32_t A)
+{
+
+	return args->mem[(uintptr_t)args->arg];
+}
+
 static void
-test_misc_tax(void)
+test_cop_ret_mem(void)
 {
 	static struct bpf_insn insns[] = {
-		BPF_STMT(BPF_LD+BPF_IMM, 3),
-		BPF_STMT(BPF_MISC+BPF_TAX, 0),
-		BPF_STMT(BPF_LD+BPF_B+BPF_IND, 2),
+		BPF_STMT(BPF_LD+BPF_IMM, 13),
+		BPF_STMT(BPF_ST, 2),
+		BPF_STMT(BPF_LD+BPF_IMM, 137),
+		BPF_STMT(BPF_ST, 1),
+		BPF_STMT(BPF_MISC+BPF_COP, 0), // retM
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
 	bpfjit_func_t code;
-	uint8_t pkt[] = { 0, 11, 22, 33, 44, 55 };
+	uint8_t pkt[1] = { 0 };
+	uint32_t mem[ctx.extwords];
+	void *arg = (void*)(uintptr_t)2;
+
+	/* Pre-inited words. */
+	mem[0] = 0;
+	mem[3] = 3;
+
+	bpf_args_t args = {
+		.pkt = pkt,
+		.buflen = sizeof(pkt),
+		.wirelen = sizeof(pkt),
+		.arg = arg,
+		.mem = mem,
+	};
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	CHECK(bpf_validate(insns, insn_count));
+	// CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(NULL, insns, insn_count);
+	code = bpfjit_generate_code(&ctx, insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(jitcall(code, pkt, sizeof(pkt), sizeof(pkt)) == 55);
+	CHECK(code(&ctx, &args) == 13);
 
 	bpfjit_free_code(code);
 }
 
 static void
-test_misc_txa(void)
+test_cop_ret_preinited_mem(void)
 {
 	static struct bpf_insn insns[] = {
-		BPF_STMT(BPF_LDX+BPF_W+BPF_IMM, 391),
-		BPF_STMT(BPF_MISC+BPF_TXA, 0),
+		BPF_STMT(BPF_LD+BPF_IMM, 13),
+		BPF_STMT(BPF_ST, 2),
+		BPF_STMT(BPF_LD+BPF_IMM, 137),
+		BPF_STMT(BPF_ST, 1),
+		BPF_STMT(BPF_MISC+BPF_COP, 0), // retM
 		BPF_STMT(BPF_RET+BPF_A, 0)
 	};
 
 	bpfjit_func_t code;
-	uint8_t pkt[1]; /* the program doesn't read any data */
+	uint8_t pkt[1] = { 0 };
+	uint32_t mem[ctx.extwords];
+	void *arg = (void*)(uintptr_t)3;
+
+	/* Pre-inited words. */
+	mem[0] = 0;
+	mem[3] = 3;
+
+	bpf_args_t args = {
+		.pkt = pkt,
+		.buflen = sizeof(pkt),
+		.wirelen = sizeof(pkt),
+		.arg = arg,
+		.mem = mem,
+	};
 
 	size_t insn_count = sizeof(insns) / sizeof(insns[0]);
 
-	CHECK(bpf_validate(insns, insn_count));
+	// CHECK(bpf_validate(insns, insn_count));
 
-	code = bpfjit_generate_code(NULL, insns, insn_count);
+	code = bpfjit_generate_code(&ctx, insns, insn_count);
 	REQUIRE(code != NULL);
 
-	CHECK(jitcall(code, pkt, 1, 1) == 391);
+	CHECK(code(&ctx, &args) == 3);
 
 	bpfjit_free_code(code);
 }
 
 void
-test_misc(void)
+test_cop_extmem(void)
 {
 
-	test_misc_tax();
-	test_misc_txa();
+	test_cop_ret_mem();
+	test_cop_ret_preinited_mem();
 }

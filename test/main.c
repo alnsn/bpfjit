@@ -43,6 +43,9 @@ int main(void)
 	test_opt();
 	test_cop();
 	test_copx();
+	test_extmem();
+	test_cop_extmem();
+	test_copx_extmem();
 
 	return exit_status;
 }

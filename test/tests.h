@@ -9,3 +9,6 @@ void test_stx(void);
 void test_opt(void);
 void test_cop(void);
 void test_copx(void);
+void test_extmem(void);
+void test_cop_extmem(void);
+void test_copx_extmem(void);

@@ -32,7 +32,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-size_t filter_pkt(bpf_ctx_t *, bpf_args_t *);
+unsigned int filter_pkt(const bpf_ctx_t *, bpf_args_t *);
 
 /* Copied from <sys/endian.h> */
 static __inline uint16_t
@@ -68,8 +68,8 @@ my_be32dec(const void *buf)
  * BPF_STMT(BPF_RET+BPF_K, UINT32_MAX),
  * BPF_STMT(BPF_RET+BPF_K, 0),
  */
-size_t
-filter_pkt(bpf_ctx_t *ctx, bpf_args_t *args)
+unsigned int
+filter_pkt(const bpf_ctx_t *ctx, bpf_args_t *args)
 {
 	const uint8_t *pkt = args->pkt;
 	size_t buflen  = args->buflen;
