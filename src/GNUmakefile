@@ -1,6 +1,6 @@
 # GNU Makefile for Travis CI. For normal builds, use mkcmake.
 CFLAGS+=	-I../ -I../sljit/sljit_src/
-#CFLAGS+=	-DBPFJIT_USE_UDIV
+#XXX CFLAGS+=	-DBPFJIT_USE_UDIV
 CFLAGS+=	-DSLJIT_CONFIG_AUTO=1
 CFLAGS+=	-DSLJIT_VERBOSE=0
 CFLAGS+=	-DSLJIT_DEBUG=0
