@@ -43,12 +43,6 @@
 #include <net/bpf.h>
 #endif
 
-/* Compat definitions. */
-#ifndef BPF_COP
-#define BPF_COP  0x20
-#define BPF_COPX 0x40
-#endif
-
 struct bpf_ctx;
 typedef struct bpf_ctx bpf_ctx_t;
 

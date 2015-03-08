@@ -33,6 +33,20 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* Compat definitions. */
+#ifndef BPF_COP
+#define BPF_COP  0x20
+#define BPF_COPX 0x40
+#endif
+
+#ifndef BPF_MOD
+#define BPF_MOD 0x90
+#endif
+
+#ifndef BPF_XOR
+#define BPF_XOR 0xa0
+#endif
+
 #define	BPF_MAX_MEMWORDS	30
 
 /*
