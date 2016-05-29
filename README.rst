@@ -10,11 +10,11 @@ You need sljit (http://sljit.sourceforge.net/) and mk-configure
 It is recommended to use pkgsrc and install devel/mk-configure.
 The pkgsrc guide is available at http://www.netbsd.org/docs/pkgsrc/.
 
-The sljit code must be at revision r220 or newer:
+The sljit code must be at revision r313 or newer:
 
-	$ svn co https://sljit.svn.sourceforge.net/svnroot/sljit@r220 sljit
+	$ svn co https://svn.code.sf.net/p/sljit/code@r313 sljit
 
-	$ tar cf sljit-r220.tar sljit/
+	$ tar cf sljit-r313.tar sljit/
 
 Building
 --------
@@ -24,7 +24,7 @@ Extract sljit tarball to sljit/ subdirectory. Make sure you pass
 
 	$ cd sljit/
 
-	$ tar kxf /path/to/sljit-r220.tar
+	$ tar kxf /path/to/sljit-r313.tar
 
 Then you can build bpfjit with this command
 
