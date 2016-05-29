@@ -3,7 +3,7 @@ rpm: sljit_svn
 	rpmbuild -ba -v --define "_topdir ${PWD}" SPECS/libbpfjit.spec
 
 sljit_svn:
-	svn co svn://svn.code.sf.net/p/sljit/code@r220 sljit_svn
+	svn co svn://svn.code.sf.net/p/sljit/code@r313 sljit_svn
 
 clean:
 	make -C src -f bpfjit.mk clean
