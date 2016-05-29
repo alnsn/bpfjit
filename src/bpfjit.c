@@ -246,10 +246,10 @@ bpfjit_modcmd(modcmd_t cmd, void *arg)
  * Return a number of scratch registers to pass
  * to sljit_emit_enter() function.
  */
-static sljit_si
+static sljit_s32
 nscratches(bpfjit_hint_t hints)
 {
-	sljit_si rv = 2;
+	sljit_s32 rv = 2;
 
 #ifdef _KERNEL
 	if (hints & BJ_HINT_PKT)
@@ -280,10 +280,10 @@ nscratches(bpfjit_hint_t hints)
  * Return a number of saved registers to pass
  * to sljit_emit_enter() function.
  */
-static sljit_si
+static sljit_s32
 nsaveds(bpfjit_hint_t hints)
 {
-	sljit_si rv = 3;
+	sljit_s32 rv = 3;
 
 	return rv;
 }
@@ -364,7 +364,7 @@ append_jump(struct sljit_jump *jump, struct sljit_jump ***jumps,
  * Emit code for BPF_LD+BPF_B+BPF_ABS    A <- P[k:1].
  */
 static int
-emit_read8(struct sljit_compiler *compiler, sljit_si src, uint32_t k)
+emit_read8(struct sljit_compiler *compiler, sljit_s32 src, uint32_t k)
 {
 
 	return sljit_emit_op1(compiler,
@@ -377,7 +377,7 @@ emit_read8(struct sljit_compiler *compiler, sljit_si src, uint32_t k)
  * Emit code for BPF_LD+BPF_H+BPF_ABS    A <- P[k:2].
  */
 static int
-emit_read16(struct sljit_compiler *compiler, sljit_si src, uint32_t k)
+emit_read16(struct sljit_compiler *compiler, sljit_s32 src, uint32_t k)
 {
 	int status;
 
@@ -421,7 +421,7 @@ emit_read16(struct sljit_compiler *compiler, sljit_si src, uint32_t k)
  * Emit code for BPF_LD+BPF_W+BPF_ABS    A <- P[k:4].
  */
 static int
-emit_read32(struct sljit_compiler *compiler, sljit_si src, uint32_t k)
+emit_read32(struct sljit_compiler *compiler, sljit_s32 src, uint32_t k)
 {
 	int status;
 
@@ -538,7 +538,7 @@ emit_xcall(struct sljit_compiler *compiler, bpfjit_hint_t hints,
 #error "Not supported assignment of registers."
 #endif
 	struct sljit_jump *jump;
-	sljit_si save_reg;
+	sljit_s32 save_reg;
 	int status;
 
 	save_reg = (BPF_CLASS(pc->code) == BPF_LDX) ? BJ_AREG : BJ_XREG;
@@ -675,7 +675,7 @@ emit_cop(struct sljit_compiler *compiler, bpfjit_hint_t hints,
 #endif
 
 	struct sljit_jump *jump;
-	sljit_si call_reg;
+	sljit_s32 call_reg;
 	sljit_sw call_off;
 	int status;
 
@@ -815,7 +815,7 @@ emit_pkt_read(struct sljit_compiler *compiler, bpfjit_hint_t hints,
 {
 	int status = SLJIT_ERR_ALLOC_FAILED;
 	uint32_t width;
-	sljit_si ld_reg;
+	sljit_s32 ld_reg;
 	struct sljit_jump *jump;
 #ifdef _KERNEL
 	struct sljit_label *label;
@@ -945,10 +945,10 @@ emit_pkt_read(struct sljit_compiler *compiler, bpfjit_hint_t hints,
 
 static int
 emit_memload(struct sljit_compiler *compiler,
-    sljit_si dst, uint32_t k, size_t extwords)
+    sljit_s32 dst, uint32_t k, size_t extwords)
 {
 	int status;
-	sljit_si src;
+	sljit_s32 src;
 	sljit_sw srcw;
 
 	srcw = k * sizeof(uint32_t);
@@ -973,10 +973,10 @@ emit_memload(struct sljit_compiler *compiler,
 
 static int
 emit_memstore(struct sljit_compiler *compiler,
-    sljit_si src, uint32_t k, size_t extwords)
+    sljit_s32 src, uint32_t k, size_t extwords)
 {
 	int status;
-	sljit_si dst;
+	sljit_s32 dst;
 	sljit_sw dstw;
 
 	dstw = k * sizeof(uint32_t);
@@ -2160,7 +2160,7 @@ bpfjit_generate_code(const bpf_ctx_t *bc,
 	bpfjit_hint_t hints;
 
 	/* memory store location for initial zero initialization */
-	sljit_si mem_reg;
+	sljit_s32 mem_reg;
 	sljit_sw mem_off;
 
 	struct bpfjit_insn_data *insn_dat;
