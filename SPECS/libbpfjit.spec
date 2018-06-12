@@ -1,7 +1,9 @@
+%define version	%(cat %{_topdir}/version.txt)
+
 Name:		libbpfjit
-Version:	0.1
+Version:	%{version}
 Release:	1%{?dist}
-Summary:	bpfjit library - JIT compiler for BPF byte-code
+Summary:	bpfjit library - JIT compiler for the BPF byte-code
 Group:		System Environment/Libraries
 License:	BSD
 URL:		https://github.com/alnsn/bpfjit
@@ -9,9 +11,10 @@ Source0:	libbpfjit.tar.gz
 
 BuildRequires:	make
 BuildRequires:	libtool
+BuildRequires:	libpcap-devel
 
 %description
-bpfjit: Just-in-Time Compilation for Berkeley Packet Filter..
+bpfjit: Just-in-Time Compilation for Berkeley Packet Filter.
 
 %prep
 %setup -q -n src

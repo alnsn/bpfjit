@@ -1,0 +1,32 @@
+Source: bpfjit
+Priority: extra
+Maintainer: https://github.com/alnsn/bpfjit
+Build-Depends:
+ debhelper (>= 9),
+ make,
+ libtool,
+ libpcap-dev
+Standards-Version: 3.9.1
+Homepage: https://github.com/alnsn/bpfjit
+License: BSD-2-clause
+
+Package: libbpfjit1
+Section: lib
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: bpfjit library - JIT compiler for the BPF byte-code
+ bpfjit: Just-in-Time Compilation for Berkeley Packet Filter.
+
+Package: libbpfjit1-dbg
+Section: debug
+Architecture: any
+Depends: ${misc:Depends}, libbpfjit1 (= ${binary:Version})
+Description: Debug symbols for libbpfjit1
+ Debug symbols for libbpfjit1.
+
+Package: libbpfjit-dev
+Section: libdevel
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libbpfjit1 (= ${binary:Version})
+Description: Development files for libbpfjit1
+ Development files for libbpfjit1.

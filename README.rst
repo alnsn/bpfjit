@@ -1,6 +1,8 @@
 Just-in-Time Compilation for Berkeley Packet Filter
 ===================================================
 
+[![Build Status](https://travis-ci.org/alnsn/bpfjit.svg?branch=master)](https://travis-ci.org/alnsn/bpfjit)
+
 Prerequisites
 -------------
 
@@ -48,3 +50,11 @@ Testing
 	$ echo $?
 
 You should see zero exit status.
+
+Packages
+--------
+
+Just build the package, install it and link the library using the
+`-lbpfjit` flag.
+* RPM (tested on RHEL/CentOS 7): `make rpm`
+* DEB (tested on Debian 9): `make deb`
