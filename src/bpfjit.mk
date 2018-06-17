@@ -1,5 +1,5 @@
 LIBS=		libbpfjit.la
-INCS=		bpfjit.h
+INCS=		bpfjit.h bpf-compat.h
 
 CFLAGS=		-std=gnu99 -O2 -Wall
 CFLAGS+=	-I../ -I../sljit_svn/sljit_src/
@@ -8,7 +8,7 @@ CFLAGS+=	-DSLJIT_CONFIG_AUTO=1
 CFLAGS+=	-DSLJIT_VERBOSE=0
 CFLAGS+=	-DSLJIT_DEBUG=0
 
-LDFLAGS=        -rpath $(LIBDIR)
+LDFLAGS=        -rpath $(LIBDIR) -version-info 1:0:0
 
 ILIBDIR=	$(DESTDIR)/$(LIBDIR)
 IINCDIR=	$(DESTDIR)/$(INCDIR)
