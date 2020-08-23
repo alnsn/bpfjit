@@ -59,6 +59,7 @@ __KERNEL_RCSID(0, "$NetBSD: bpfjit.c,v 1.43 2015/02/14 21:32:46 alnsn Exp $");
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 #else
 #include <sys/atomic.h>
 #include <sys/module.h>
@@ -606,8 +607,12 @@ emit_xcall(struct sljit_compiler *compiler, bpfjit_hint_t hints,
 		return status;
 
 	/* fn(buf, k, &err); */
-	status = sljit_emit_ijump(compiler,
-	    SLJIT_CALL3,
+	status = sljit_emit_icall(compiler,
+	    SLJIT_CALL_CDECL,
+	    SLJIT_DEF_RET(SLJIT_ARG_TYPE_U32) |
+	    SLJIT_DEF_ARG1(SLJIT_ARG_TYPE_UW) |
+	    SLJIT_DEF_ARG2(SLJIT_ARG_TYPE_U32) |
+	    SLJIT_DEF_ARG3(SLJIT_ARG_TYPE_UW),
 	    SLJIT_IMM, SLJIT_FUNC_OFFSET(fn));
 	if (status != SLJIT_SUCCESS)
 		return status;
@@ -764,8 +769,13 @@ emit_cop(struct sljit_compiler *compiler, bpfjit_hint_t hints,
 	if (status != SLJIT_SUCCESS)
 		return status;
 
-	status = sljit_emit_ijump(compiler,
-	    SLJIT_CALL3, call_reg, call_off);
+	status = sljit_emit_icall(compiler,
+	    SLJIT_CALL_CDECL,
+	    SLJIT_DEF_RET(SLJIT_ARG_TYPE_U32) |
+	    SLJIT_DEF_ARG1(SLJIT_ARG_TYPE_UW) |
+	    SLJIT_DEF_ARG2(SLJIT_ARG_TYPE_UW) |
+	    SLJIT_DEF_ARG3(SLJIT_ARG_TYPE_U32),
+	    call_reg, call_off);
 	if (status != SLJIT_SUCCESS)
 		return status;
 
@@ -1125,14 +1135,14 @@ emit_pow2_moddiv(struct sljit_compiler *compiler, const struct bpf_insn *pc)
 }
 
 #if !defined(BPFJIT_USE_UDIV)
-static sljit_uw
+static sljit_uw SLJIT_FUNC
 divide(sljit_uw x, sljit_uw y)
 {
 
 	return (uint32_t)x / (uint32_t)y;
 }
 
-static sljit_uw
+static sljit_uw SLJIT_FUNC
 modulus(sljit_uw x, sljit_uw y)
 {
 
@@ -1148,7 +1158,6 @@ static int
 emit_moddiv(struct sljit_compiler *compiler, const struct bpf_insn *pc)
 {
 	int status;
-	const bool xdiv = BPF_OP(pc->code) == BPF_DIV;
 	const bool xreg = BPF_SRC(pc->code) == BPF_X;
 
 #if BJ_XREG == SLJIT_RETURN_REG   || \
@@ -1176,7 +1185,7 @@ emit_moddiv(struct sljit_compiler *compiler, const struct bpf_insn *pc)
 		return status;
 
 #if defined(BPFJIT_USE_UDIV)
-	status = sljit_emit_op0(compiler, SLJIT_UDIV|SLJIT_I32_OP);
+	status = sljit_emit_op0(compiler, SLJIT_DIV_U32);
 
 	if (BPF_OP(pc->code) == BPF_DIV) {
 #if BJ_AREG != SLJIT_R0
@@ -1198,10 +1207,14 @@ emit_moddiv(struct sljit_compiler *compiler, const struct bpf_insn *pc)
 	if (status != SLJIT_SUCCESS)
 		return status;
 #else
-	status = sljit_emit_ijump(compiler,
-	    SLJIT_CALL2,
-	    SLJIT_IMM, xdiv ? SLJIT_FUNC_OFFSET(divide) :
-		SLJIT_FUNC_OFFSET(modulus));
+	status = sljit_emit_icall(compiler,
+	    SLJIT_CALL,
+	    SLJIT_DEF_RET(SLJIT_ARG_TYPE_UW) |
+	    SLJIT_DEF_ARG1(SLJIT_ARG_TYPE_UW) |
+	    SLJIT_DEF_ARG2(SLJIT_ARG_TYPE_UW),
+	    SLJIT_IMM,
+	    BPF_OP(pc->code) == BPF_DIV ?
+		SLJIT_FUNC_OFFSET(divide) : SLJIT_FUNC_OFFSET(modulus));
 
 #if BJ_AREG != SLJIT_RETURN_REG
 	status = sljit_emit_op1(compiler,
@@ -2201,8 +2214,10 @@ bpfjit_generate_code(const bpf_ctx_t *bc,
 	sljit_compiler_verbose(compiler, stderr);
 #endif
 
-	status = sljit_emit_enter(compiler, 0, 2, nscratches(hints),
-	    NSAVEDS, 0, 0, sizeof(struct bpfjit_stack));
+	status = sljit_emit_enter(compiler, 0,
+	    SLJIT_DEF_ARG1(SLJIT_ARG_TYPE_UW) |
+	    SLJIT_DEF_ARG2(SLJIT_ARG_TYPE_UW),
+	    nscratches(hints), NSAVEDS, 0, 0, sizeof(struct bpfjit_stack));
 	if (status != SLJIT_SUCCESS)
 		goto fail;
 
