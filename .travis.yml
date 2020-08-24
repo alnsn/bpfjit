@@ -1,5 +1,5 @@
 language: c
-before_script: rm -rf sljit && git clone https://github.com/zherczeg/sljit.git --depth 0 && curl 'http://www.opensource.apple.com/source/libpcap/libpcap-16/libpcap/pcap-bpf.h?txt' -o pcap-bpf.h
+before_script: rm -rf sljit && git clone --depth=1 --branch=master https://github.com/zherczeg/sljit.git && curl 'http://www.opensource.apple.com/source/libpcap/libpcap-16/libpcap/pcap-bpf.h?txt' -o pcap-bpf.h
 script: make -C src/
 
 env:
