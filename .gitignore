@@ -17,9 +17,6 @@
 *.out
 *.app
 
-# mk-configure
-_mkc_*
-
 # Tags
 tags
 
